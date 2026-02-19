@@ -1,8 +1,1 @@
-let x: f32 = 20.2;
-
-fn test() void {
-  mut y: bool = true;
-  let z: bool = false;
-  x++;
-}
-
+let x: @@@f32 = 20.2;

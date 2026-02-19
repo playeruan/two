@@ -39,6 +39,8 @@ struct VarExpr {
 
 struct TypeExpr {
 	name string
+mut:
+	ptr_depth int
 }
 
 struct ParenExpr {
@@ -122,7 +124,7 @@ fn (mut p Parser) advance() Token {
 
 fn (mut p Parser) expect(kind TokKind) {
 	if p.peek().kind != kind {
-		panic("expected ${kind}, got ${p.peek().kind}")
+		panic("expected ${kind}, got ${p.peek().kind} at line ${p.line}")
 	}
 	p.advance()
 }
@@ -178,12 +180,19 @@ fn (mut p Parser) parse_binary(left Expr, op string, prec Precedence) BinaryExpr
 }
 
 fn (mut p Parser) parse_type() TypeExpr {
-	t := p.peek()
+	mut t := p.peek()
+	if t.kind == .at {
+		p.advance()
+		mut type := p.parse_type()
+		type.ptr_depth++
+		return type
+	}
+	t = p.peek()
 	if t.kind.is_primitive_type() {
-		return TypeExpr{t.lit}
+		return TypeExpr{t.lit, 0}
 	}
 	// class types
-	return TypeExpr{'void'}
+	return TypeExpr{'void', 0}
 }
 
 // --- parsing stmts

@@ -5,6 +5,15 @@ pub mut:
 	table SymbolTable
 }
 
+fn assert_types_match(t1 TypeExpr, t2 TypeExpr) {
+	if t1.name != t2.name {
+		panic("Type mismatch between ${t1.name} and ${t2.name}")
+	}
+	if t1.ptr_depth != t2.ptr_depth {
+		panic("Pointer depth mismatch for type ${t1.name}: ${t1.ptr_depth} and ${t2.ptr_depth}")
+	}
+}
+
 pub fn (mut c Checker) check(stmts []Stmt) {
 	c.table.jump_to_scope(c.table.scopes[0])
 	for stmt in stmts {
@@ -14,10 +23,10 @@ pub fn (mut c Checker) check(stmts []Stmt) {
 
 fn (mut c Checker) check_expr(expr Expr) TypeExpr {
 	return match expr {
-		IntegerLiteral {TypeExpr{'i32'}}
-		FloatLiteral   {TypeExpr{'f32'}}
-		BoolLiteral    {TypeExpr{'bool'}}
-		StringLiteral   {TypeExpr{'string'}}
+		IntegerLiteral {TypeExpr{'i32',  0}}
+		FloatLiteral   {TypeExpr{'f32',  0}}
+		BoolLiteral    {TypeExpr{'bool', 0}}
+		StringLiteral   {TypeExpr{'string', 0}}
 		TypeExpr       {expr}
 		VarExpr        {
 			sym := c.table.lookup_var(expr.name) or {
@@ -28,7 +37,7 @@ fn (mut c Checker) check_expr(expr Expr) TypeExpr {
 		BinaryExpr    {c.check_binary_expr(expr)}
 		UnaryExpr     {c.check_expr(expr.expr)}
 		ParenExpr     {c.check_expr(expr.expr)}
-		VoidExpr      {TypeExpr{'void'}}
+		VoidExpr      {TypeExpr{'void', 0}}
 	}
 }
 
@@ -36,9 +45,7 @@ fn (mut c Checker) check_binary_expr(bin BinaryExpr) TypeExpr {
 	left_type := c.check_expr(bin.left)
 	right_type := c.check_expr(bin.right)
 
-	if left_type.name != right_type.name {
-		panic('Binary operator "${bin.op}" cannot be applied to ${left_type.name} and ${right_type.name}')
-	}
+	assert_types_match(left_type, right_type)
 
 	return left_type
 }
@@ -56,9 +63,7 @@ fn (mut c Checker) check_stmt(stmt Stmt) {
 fn (mut c Checker) check_var_decl(decl VarDecl) {
 	val_type := c.check_expr(decl.value)
 
-	if decl.type.name != val_type.name {
-		panic("Type miismatch in assignment for ${decl.name}: expected ${decl.type.name}, got ${val_type.name}")
-	}
+	assert_types_match(decl.type, val_type)
 }
 
 fn (mut c Checker) check_func_decl(decl FuncDecl) {
