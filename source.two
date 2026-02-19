@@ -1,4 +1,4 @@
-fn main(const x: @f32, y: @@bool): i32 {
+fn foo(const x: @f32, y: @@bool): i32 {
   mut ciao: i32 = 5;
   mut ciaop: @i32 = addr(ciao);
 }

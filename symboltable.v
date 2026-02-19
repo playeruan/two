@@ -28,6 +28,15 @@ mut:
 	vars map[string]VarSymbol
 }
 
+fn (s Scope) str() string {
+	mut st := "{"
+	for sym in s.vars.values() {
+		st+=" ("+sym.type.str()+" "+sym.name+")"
+	}
+	st+=" }"
+	return st
+}
+
 struct SymbolTable {
 mut:
 	scopes  []Scope

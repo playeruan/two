@@ -63,7 +63,7 @@ fn (e Expr) is_literal() bool {
 	}
 }
 
-fn (te TypeExpr) get_type_string() string {
+fn (te TypeExpr) str() string {
 	return ("@".repeat(te.ptr_depth))+te.name
 }
 
@@ -108,8 +108,8 @@ struct VarDecl {
 
 struct FuncDecl {
 	name string
-	args []ArgDecl
 	type TypeExpr
+	args []ArgDecl
 	block Block
 	flags DeclFlags
 }
@@ -336,8 +336,8 @@ fn (mut p Parser) parse_fn_decl() FuncDecl {
 
 	return FuncDecl {
 		name_tok.lit
-		args
 		ret_type
+		args
 		block
 		DeclFlags{}
 	}

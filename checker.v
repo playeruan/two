@@ -6,8 +6,8 @@ pub mut:
 }
 
 fn assert_types_match(t1 TypeExpr, t2 TypeExpr) {
-	if t1.get_type_string() != t2.get_type_string() {
-		panic("Type mismatch between ${t1.get_type_string()} and ${t2.get_type_string()}")
+	if t1.str() != t2.str() {
+		panic("Type mismatch between ${t1.str()} and ${t2.str()}")
 	}
 }
 
