@@ -6,11 +6,8 @@ pub mut:
 }
 
 fn assert_types_match(t1 TypeExpr, t2 TypeExpr) {
-	if t1.name != t2.name {
-		panic("Type mismatch between ${t1.name} and ${t2.name}")
-	}
-	if t1.ptr_depth != t2.ptr_depth {
-		panic("Pointer depth mismatch for type ${t1.name}: ${t1.ptr_depth} and ${t2.ptr_depth}")
+	if t1.get_type_string() != t2.get_type_string() {
+		panic("Type mismatch between ${t1.get_type_string()} and ${t2.get_type_string()}")
 	}
 }
 
@@ -77,7 +74,7 @@ fn (mut c Checker) check_var_decl(decl VarDecl) {
 }
 
 fn (mut c Checker) check_func_decl(decl FuncDecl) {
-
+	c.check_block(decl.block)
 }
 
 fn (mut c Checker) check_block(block Block) {

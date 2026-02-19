@@ -63,6 +63,10 @@ fn (e Expr) is_literal() bool {
 	}
 }
 
+fn (te TypeExpr) get_type_string() string {
+	return ("@".repeat(te.ptr_depth))+te.name
+}
+
 // ---------------------------------
 
 struct DeclFlags {

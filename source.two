@@ -1,4 +1,4 @@
-fn main(): int {
+fn main(): i32 {
   mut ciao: i32 = 5;
-  let puntatore: @i32 = addr(ciao);
+  mut ciaop: i32 = addr(ciao);
 }
