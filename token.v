@@ -17,6 +17,8 @@ enum TokKind as u8 {
 	key_string
 	key_true
 	key_false
+	key_addr
+	key_deref
 	integer_lit
 	float_lit
 	string_lit
@@ -142,6 +144,8 @@ fn get_kind_if_key(s string) ?TokKind {
 		"false" {.key_false}
 		"true"  {.key_true}
 		"string"{.key_string}
+		"addr"  {.key_addr}
+		"deref" {.key_deref}
 		else  {none}
 	}
 }

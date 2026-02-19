@@ -1,6 +1,6 @@
 module two
 
-type Expr = VoidExpr | UnaryExpr | BinaryExpr | IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | VarExpr | TypeExpr | ParenExpr
+type Expr = VoidExpr | UnaryExpr | BinaryExpr | IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | VarExpr | TypeExpr | ParenExpr | RefExpr | DerefExpr
 type LiteralExpr = IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral
 
 struct VoidExpr {}
@@ -45,6 +45,22 @@ mut:
 
 struct ParenExpr {
 	expr Expr
+}
+
+struct RefExpr {
+	expr Expr
+}
+
+struct DerefExpr {
+	expr Expr
+}
+
+fn (e Expr) is_literal() bool {
+	return match e {
+		IntegerLiteral, FloatLiteral,
+		BoolLiteral, StringLiteral {true}
+		else {false}
+	}
 }
 
 // ---------------------------------
@@ -155,8 +171,30 @@ fn (mut p Parser) parse_primary() Expr {
 		.string_lit  {StringLiteral{t.lit}}
 		.key_true, .key_false {BoolLiteral{t.kind == .key_true}}
 		.identifier  {p.parse_ident(t.lit)}
+		.key_addr    {p.parse_addr()}
+		.key_deref   {p.parse_deref()}
 		else {panic("error here")}
 	}
+}
+
+fn (mut p Parser) parse_addr() RefExpr {
+	p.expect(.leftparen)
+  expr := p.parse_expr(.prefix)
+	if expr.is_literal() {
+		panic("cannot reference a literal value")
+	}
+	p.expect(.rightparen)
+	return RefExpr{expr}
+}
+
+fn (mut p Parser) parse_deref() DerefExpr {
+	p.expect(.leftparen)
+	expr := p.parse_expr(.prefix)
+	if expr.is_literal() {
+		panic("cannot dereference a literal value")
+	}
+	p.expect(.rightparen)
+	return DerefExpr{expr}
 }
 
 fn (mut p Parser) parse_ident(ident string) Expr {

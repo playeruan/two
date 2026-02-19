@@ -38,6 +38,7 @@ fn (mut c Checker) check_expr(expr Expr) TypeExpr {
 		UnaryExpr     {c.check_expr(expr.expr)}
 		ParenExpr     {c.check_expr(expr.expr)}
 		VoidExpr      {TypeExpr{'void', 0}}
+		else          {TypeExpr{'void', 0}}
 	}
 }
 
