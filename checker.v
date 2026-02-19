@@ -26,7 +26,7 @@ fn (mut c Checker) check_expr(expr Expr) TypeExpr {
 		IntegerLiteral {TypeExpr{'i32',  0}}
 		FloatLiteral   {TypeExpr{'f32',  0}}
 		BoolLiteral    {TypeExpr{'bool', 0}}
-		StringLiteral   {TypeExpr{'string', 0}}
+		StringLiteral  {TypeExpr{'string', 0}}
 		TypeExpr       {expr}
 		VarExpr        {
 			sym := c.table.lookup_var(expr.name) or {

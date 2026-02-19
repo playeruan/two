@@ -3,6 +3,7 @@ module two
 enum TokKind as u8 {
 	key_let
 	key_mut
+	key_fn
 	key_i8
 	key_i16
 	key_i32
@@ -146,6 +147,7 @@ fn get_kind_if_key(s string) ?TokKind {
 		"string"{.key_string}
 		"addr"  {.key_addr}
 		"deref" {.key_deref}
+		"fn"    {.key_fn}
 		else  {none}
 	}
 }

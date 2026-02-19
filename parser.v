@@ -225,7 +225,7 @@ fn (mut p Parser) parse_type() TypeExpr {
 		type.ptr_depth++
 		return type
 	}
-	t = p.peek()
+	t = p.advance()
 	if t.kind.is_primitive_type() {
 		return TypeExpr{t.lit, 0}
 	}
@@ -238,6 +238,7 @@ fn (mut p Parser) parse_type() TypeExpr {
 fn (mut p Parser) parse_stmt() Stmt {
 	match p.peek().kind {
 		.key_let, .key_mut {return p.parse_var_decl()}
+		.key_fn            {return p.parse_fn_decl()}
 		.leftbrace         {return p.parse_block()}
 		else               {return p.parse_expr_stmt()}
 	}
@@ -253,7 +254,6 @@ fn (mut p Parser) parse_var_decl() VarDecl {
 
 	p.expect(.colon)
 	type_expr := p.parse_type()
-	p.advance()
 	p.expect(.eq)
 	val := p.parse_expr(.lowest)
 	p.expect(.semicolon)
@@ -270,6 +270,30 @@ fn (mut p Parser) parse_var_decl() VarDecl {
 		type: type_expr
 		flags: flags
 	}
+}
+
+fn (mut p Parser) parse_fn_decl() FuncDecl {
+	p.advance()
+	name_tok := p.advance()
+	if name_tok.kind != .identifier {
+		panic("expected identifier after fn, got ${name_tok.lit}")
+	}
+
+	p.expect(.leftparen)
+	p.expect(.rightparen)
+	p.expect(.colon)
+
+	ret_type := p.parse_type()
+	block := p.parse_block()
+
+	return FuncDecl {
+		name_tok.lit
+		[]
+		ret_type
+		block
+		DeclFlags{}
+	}
+
 }
 
 fn (mut p Parser) parse_block() Block {

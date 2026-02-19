@@ -1,3 +1,4 @@
-let x: f32 = 20.2;
-let y: @f32 = addr(x);
-let z: f64 = deref(y);
+fn main(): int {
+  mut ciao: i32 = 5;
+  let puntatore: @i32 = addr(ciao);
+}
