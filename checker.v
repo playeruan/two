@@ -48,9 +48,16 @@ fn (mut c Checker) check_expr(expr Expr) TypeExpr {
 	}
 }
 
+const assignment_ops = [
+	"=", "++", "--", "+=", "-="
+]
 fn (mut c Checker) check_binary_expr(bin BinaryExpr) TypeExpr {
 	left_type := c.check_expr(bin.left)
 	right_type := c.check_expr(bin.right)
+
+	/*if assignment_ops.contains(bin.op) && bin.left.flags {
+
+	}*/
 
 	assert_types_match(left_type, right_type)
 

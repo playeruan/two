@@ -3,6 +3,7 @@ module two
 enum TokKind as u8 {
 	key_let
 	key_mut
+	key_const
 	key_fn
 	key_i8
 	key_i16
@@ -35,6 +36,7 @@ enum TokKind as u8 {
 	star
 	slash
 	dot
+	comma
 	colon
 	semicolon
 	at
@@ -112,6 +114,7 @@ fn get_kind_if_delimiter(s string) ?TokKind {
 		"*"  {.star}
 		"/"  {.slash}
 		"."  {.dot}
+		","  {.comma}
 		"++" {.increment}
 		"--" {.decrement}
 		"("  {.leftparen}
@@ -131,6 +134,7 @@ fn get_kind_if_key(s string) ?TokKind {
 	return match s {
 		"mut"   {.key_mut}
  		"let"   {.key_let}
+		"const" {.key_const}
 		"i8"    {.key_i8}
 		"i16"   {.key_i16}
 		"i32"   {.key_i32}

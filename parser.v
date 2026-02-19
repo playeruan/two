@@ -76,8 +76,28 @@ struct DeclFlags {
 	abstract bool
 }
 
-type Stmt = VarDecl | FuncDecl | ClassDecl |
-						ExprStmt | Arg | Member | Block
+fn (f DeclFlags) str() string {
+	mut s := ""
+	if f.const {
+		s+="const "
+	}
+	if f.mutable {
+		s+="mutable "
+	}
+	if f.public {
+		s+="public "
+	}
+	if f.abstract {
+		s+="abstract "
+	}
+	if s=="" {
+		s+="none"
+	}
+	return s
+}
+
+type Stmt = VarDecl | FuncDecl | ClassDecl | ArgDecl |
+						ExprStmt | Member | Block
 
 struct VarDecl {
 	name string
@@ -88,7 +108,7 @@ struct VarDecl {
 
 struct FuncDecl {
 	name string
-	args []Arg
+	args []ArgDecl
 	type TypeExpr
 	block Block
 	flags DeclFlags
@@ -100,14 +120,14 @@ struct ClassDecl {
 	flags DeclFlags
 }
 
-struct ExprStmt {
-	expr Expr
-}
-
-struct Arg {
+struct ArgDecl {
 	name string
 	type TypeExpr
 	flags DeclFlags
+}
+
+struct ExprStmt {
+	expr Expr
 }
 
 struct Member {
@@ -284,6 +304,30 @@ fn (mut p Parser) parse_fn_decl() FuncDecl {
 	}
 
 	p.expect(.leftparen)
+
+	mut args := []ArgDecl{}
+	for p.peek().kind != .rightparen {
+		mut is_const:= false
+		if p.peek().kind == .key_const {
+			is_const = true
+			p.advance()
+		}
+		ident_tok := p.peek()
+		p.expect(.identifier)
+		p.expect(.colon)
+		type_expr := p.parse_type()
+		if p.peek().kind != .rightparen {
+			p.expect(.comma)
+		}
+		args << ArgDecl{
+			name: ident_tok.lit
+			type: type_expr
+			flags: DeclFlags{
+				const: is_const
+			}
+		}
+	}
+
 	p.expect(.rightparen)
 	p.expect(.colon)
 
@@ -292,7 +336,7 @@ fn (mut p Parser) parse_fn_decl() FuncDecl {
 
 	return FuncDecl {
 		name_tok.lit
-		[]
+		args
 		ret_type
 		block
 		DeclFlags{}
