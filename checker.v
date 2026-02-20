@@ -59,6 +59,7 @@ fn (mut c Checker) check_binary_expr(bin BinaryExpr) TypeExpr {
 	/*if assignment_ops.contains(bin.op) && bin.left.flags {
 
 	}*/
+	println("todo: check not to assign to const or immutable")
 	dump(left_type)
 	dump(right_type)
 	assert_types_match(left_type, right_type)
