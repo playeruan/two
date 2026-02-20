@@ -94,7 +94,7 @@ fn (te TypeExpr) str() string {
 			s += t.str()
 		}
 		ret_t := *te.ret_type or {&TypeExpr{'void', 0, false, [], none}}
-		s += "): " + ret_t.str()
+		s += ") -> " + ret_t.str()
 		return s
 	}
 	return ("@".repeat(te.ptr_depth))+te.name
@@ -237,7 +237,6 @@ fn (mut p Parser) parse_expr(prec Precedence) Expr {
 fn (mut p Parser) parse_primary() Expr {
 	t := p.advance()
 
-	dump(t.kind)
 	return match t.kind {
 		.integer_lit {IntegerLiteral{t.lit.i64()}}
 		.float_lit   {FloatLiteral{t.lit.f64()}}

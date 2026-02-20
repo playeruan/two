@@ -1,3 +1,13 @@
-let ciao_ciao: fn() -> i32 = fn() -> i32 {return 1;};
 
+class Entity {
+  parent: @Entity;
+  name  :  string;
+}
 
+fn get_update(e: Entity) -> fn(Entity) -> void {
+  return fn(e_: Entity) -> void {};
+}
+
+let e: Entity = Entity{nullptr, "nome"};
+let update: fn(Entity) -> void = get_update(e);
+update(e);
