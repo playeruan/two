@@ -6,6 +6,7 @@ enum TokKind as u8 {
 	key_const
 	key_class
 	key_fn
+	key_void
 	key_i8
 	key_i16
 	key_i32
@@ -22,6 +23,8 @@ enum TokKind as u8 {
 	key_false
 	key_addr
 	key_deref
+	key_nullptr
+	key_return
 	integer_lit
 	float_lit
 	string_lit
@@ -89,6 +92,7 @@ fn (tk TokKind) get_prec() Precedence {
 		.plus, .minus {.sum}
 		.star, .slash {.product}
 		.dot {.access}
+		.leftparen {.call}
 		.increment, .decrement {.suffix}
 		else {.lowest}
 	}
@@ -98,7 +102,7 @@ fn (tk TokKind) is_primitive_type() bool {
 	return [
 		TokKind.key_i8, .key_u8, .key_i16, .key_u16,
 		.key_i32, .key_u32, .key_i64, .key_u64,
-		.key_f32, .key_f64, .key_bool, .key_string
+		.key_f32, .key_f64, .key_bool, .key_string, .key_void
 	].contains(tk)
 }
 
@@ -137,6 +141,7 @@ fn get_kind_if_key(s string) ?TokKind {
  		"let"   {.key_let}
 		"const" {.key_const}
 		"class" {.key_class}
+		"void"  {.key_void}
 		"i8"    {.key_i8}
 		"i16"   {.key_i16}
 		"i32"   {.key_i32}
@@ -154,6 +159,8 @@ fn get_kind_if_key(s string) ?TokKind {
 		"addr"  {.key_addr}
 		"deref" {.key_deref}
 		"fn"    {.key_fn}
+		"nullptr" {.key_nullptr}
+		"return"  {.key_return}
 		else  {none}
 	}
 }

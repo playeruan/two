@@ -27,19 +27,19 @@ mut:
 }
 
 struct Scope {
-	parent ?&Scope
+	parent_idx int = -1
 mut:
 	vars map[string]VarSymbol
 }
 
-fn (s Scope) str() string {
+fn (s Scope) to_str(t SymbolTable) string {
 	mut st := "{"
 	for sym in s.vars.values() {
 		st+=" ("+sym.type.str()+" "+sym.name+")"
 	}
 	st+=" }"
-	if s.parent != none {
-		st+=" <- "+(*s.parent).str()
+	if s.parent_idx != -1 {
+		st+=" <- "+(t.scopes[s.parent_idx]).to_str(t)
 	}
 	return st
 }
@@ -47,24 +47,24 @@ fn (s Scope) str() string {
 struct SymbolTable {
 mut:
 	scopes  []Scope
-	current_scope ?&Scope
+	current_scope_idx int = -1
 	funcs   map[string]FuncSymbol
 	classes map[string]ClassSymbol
 }
 
-fn (mut t SymbolTable) jump_to_scope(scope &Scope) {
-	unsafe {t.current_scope = scope}
+fn (mut t SymbolTable) jump_to_scope(idx int) {
+	unsafe {t.current_scope_idx = idx}
 }
 
 fn (mut t SymbolTable) enter_scope() {
-	t.scopes << Scope{parent: t.current_scope}
-	t.current_scope = &t.scopes[t.scopes.len-1]
+	t.scopes << Scope{parent_idx: t.current_scope_idx}
+	t.current_scope_idx = t.scopes.len-1
 }
 
 fn (mut t SymbolTable) exit_scope() {
-	if t.current_scope == none {panic("no scope to exit from")}
+	if t.current_scope_idx == -1 {panic("no scope to exit from")}
 	else {
-		t.current_scope = t.current_scope.parent
+		t.current_scope_idx = t.scopes[t.current_scope_idx].parent_idx
 	}
 }
 
@@ -75,8 +75,7 @@ fn (mut t SymbolTable) define_var(name string, type TypeExpr, flags DeclFlags) {
 		panic("variable redefinition")
 	}
 
-	scope := t.current_scope or {panic("nonexistant scope")}
-	(*scope).vars[name] = VarSymbol {type: type, flags: flags, name: name}
+	t.scopes[t.current_scope_idx].vars[name] = VarSymbol {type: type, flags: flags, name: name}
 }
 
 fn (mut t SymbolTable) declare_func(name string, args[]ArgDecl) {
@@ -96,6 +95,18 @@ fn (mut t SymbolTable) declare_func(name string, args[]ArgDecl) {
 			only_declared: true
 		}
 	}
+
+  t.scopes[0].vars[name] = VarSymbol {
+  	name: name
+    type: TypeExpr {
+					name,
+					0
+					true
+					[]
+					none
+				}
+    flags: DeclFlags{}
+  }
 }
 
 fn (mut t SymbolTable) define_func(name string, type TypeExpr, flags DeclFlags, block Block, args []ArgDecl) {
@@ -124,6 +135,23 @@ fn (mut t SymbolTable) define_func(name string, type TypeExpr, flags DeclFlags, 
 			only_declared: false
 		}
 	}
+
+	mut f_arg_types := []TypeExpr{}
+	for arg in args {
+		f_arg_types << arg.type
+	}
+
+  t.scopes[0].vars[name] = VarSymbol {
+  	name: name
+    type: TypeExpr {
+					name,
+					type.ptr_depth
+					true
+					f_arg_types,
+					&type
+				}
+    flags: flags
+  }
 }
 
 fn (mut t SymbolTable) declare_class(name string) {
@@ -161,15 +189,14 @@ fn (mut t SymbolTable) define_class(name string, members []Member) {
 }
 
 fn (mut t SymbolTable) lookup_var(name string) ?VarSymbol {
-	if t.scopes.len == 0 {panic("no scope available")}
-	mut scope := *t.current_scope or {panic("nonexistant scope")}
-	for true {
-		if name in scope.vars {return scope.vars[name]}
-		if scope.parent != none {
-			scope = *scope.parent
-		} else {
-			break
+	mut idx := t.current_scope_idx
+	for idx != -1 {
+		scope := t.scopes[idx]
+		if name in scope.vars {
+			unsafe {return scope.vars[name]}
 		}
+		dump(idx)
+		idx = scope.parent_idx
 	}
 	return none
 }

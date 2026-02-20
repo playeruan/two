@@ -1,19 +1,4 @@
+fn foo(f: @fn(): void): fn(): i32 {return fn(): i32 {return 1;};}
+let vf: fn(): void = fn(): void {};
+let x: i32 = foo(addr(vf))();
 
-let g: f32 = 1.0;
-let l: i32 = 6;
-
-class Vec2 {
-  x: i32;
-  y: i32;
-}
-
-class Entity {
-  pos: Vec2;
-  parent: @Entity;
-}
-
-fn getparent(p: i32, e: @f32): Entity {
-  let x: i32 = 6;
-}
-
-getparent(38, g);

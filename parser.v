@@ -1,9 +1,10 @@
 module two
 
-type Expr = VoidExpr | UnaryExpr | BinaryExpr | IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | VarExpr | TypeExpr | ParenExpr | RefExpr | DerefExpr | FnCall | ClassInstantiation
-type LiteralExpr = IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | ClassInstantiation
+type Expr = VoidExpr | UnaryExpr | BinaryExpr | IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | VarExpr | TypeExpr | ParenExpr | RefExpr | DerefExpr | FnCall | ClassInstantiation | NullptrExpr | LambdaExpr
+type LiteralExpr = IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | ClassInstantiation | NullptrExpr
 
 struct VoidExpr {}
+struct NullptrExpr{}
 
 struct UnaryExpr {
 	expr Expr
@@ -41,6 +42,9 @@ struct TypeExpr {
 	name string
 mut:
 	ptr_depth int
+	is_fn bool
+	arg_types []TypeExpr
+	ret_type ?&TypeExpr
 }
 
 struct ParenExpr {
@@ -56,6 +60,19 @@ struct DerefExpr {
 }
 
 struct FnCall {
+	callee Expr
+	args []Expr
+}
+
+struct LambdaExpr {
+	args []ArgDecl
+	ret_type TypeExpr
+	block Block
+mut:
+	internal_name string
+}
+
+struct ClassInstantiation {
 	name string
 	args []Expr
 }
@@ -63,12 +80,23 @@ struct FnCall {
 fn (e Expr) is_literal() bool {
 	return match e {
 		IntegerLiteral, FloatLiteral,
-		BoolLiteral, StringLiteral {true}
+		BoolLiteral, StringLiteral,
+		ClassInstantiation, NullptrExpr,
+		VoidExpr {true}
 		else {false}
 	}
 }
 
 fn (te TypeExpr) str() string {
+	if te.is_fn {
+		mut s := "@".repeat(te.ptr_depth)+"fn("
+		for t in te.arg_types {
+			s += t.str()
+		}
+		ret_t := *te.ret_type or {&TypeExpr{'void', 0, false, [], none}}
+		s += "): " + ret_t.str()
+		return s
+	}
 	return ("@".repeat(te.ptr_depth))+te.name
 }
 
@@ -98,7 +126,7 @@ fn (f DeclFlags) str() string {
 }
 
 type Stmt = VarDecl | FuncDecl | ClassDecl | ArgDecl |
-						ExprStmt | Member | Block
+						ExprStmt | Member | Block | ReturnStmt
 
 struct VarDecl {
 	name string
@@ -139,7 +167,23 @@ struct Member {
 
 struct Block {
 	stmts []Stmt
-	scope &Scope
+	scope_idx int
+}
+
+struct ReturnStmt {
+	expr Expr
+}
+
+fn (b Block) get_all_returns() []ReturnStmt {
+	mut returns := []ReturnStmt{}
+	for stmt in b.stmts {
+		if stmt is ReturnStmt {
+			returns << stmt
+		} else if stmt is Block {
+			returns << stmt.get_all_returns()
+		}
+	}
+	return returns
 }
 
 // ---------------------------------
@@ -180,6 +224,9 @@ fn (mut p Parser) parse_expr(prec Precedence) Expr {
 		expr = match op_tok.kind {
 			.dot {p.parse_access(expr)}
 			.increment, .decrement {UnaryExpr{expr, op_tok.lit, false}}
+			.leftparen {
+				p.parse_call(expr)
+			}
 			else {p.parse_binary(expr, op_tok.lit, op_tok.kind.get_prec())}
 		}
 	}
@@ -194,10 +241,12 @@ fn (mut p Parser) parse_primary() Expr {
 		.integer_lit {IntegerLiteral{t.lit.i64()}}
 		.float_lit   {FloatLiteral{t.lit.f64()}}
 		.string_lit  {StringLiteral{t.lit}}
+		.key_nullptr {NullptrExpr{}}
 		.key_true, .key_false {BoolLiteral{t.kind == .key_true}}
 		.identifier  {p.parse_ident(t.lit)}
 		.key_addr    {p.parse_addr()}
 		.key_deref   {p.parse_deref()}
+		.key_fn      {p.parse_lambda()}
 		else {panic("error here")}
 	}
 }
@@ -222,16 +271,45 @@ fn (mut p Parser) parse_deref() DerefExpr {
 	return DerefExpr{expr}
 }
 
+fn (mut p Parser) parse_lambda() LambdaExpr {
+	p.expect(.leftparen)
+  mut args := []ArgDecl{}
+  for p.peek().kind != .rightparen {
+		arg_name := p.peek().lit
+		p.expect(.identifier)
+		p.expect(.colon)
+    arg_type := p.parse_type()
+    args << ArgDecl{name: arg_name, type: arg_type}
+
+  	if p.peek().kind != .rightparen {
+			p.expect(.comma)
+		}
+  }
+  p.expect(.rightparen)
+  p.expect(.colon)
+  ret_type := p.parse_type()
+  block := p.parse_block()
+
+  return LambdaExpr{args: args, ret_type: ret_type, block: block}
+}
+
 fn (mut p Parser) parse_ident(ident string) Expr {
+
+	if p.symbols.lookup_class(ident) != none && p.peek().kind == .leftbrace {
+		return p.parse_class_instantiation(ident)
+	}
+
 	return match p.peek().kind {
-		.leftparen {p.parse_call(ident)}
+		.leftparen {
+			p.advance()
+			p.parse_call(VarExpr{name: ident})
+		}
 		else       {VarExpr{name: ident}}
 	}
 }
 
-fn (mut p Parser) parse_call(callee string) FnCall {
+fn (mut p Parser) parse_call(left_expr Expr) FnCall {
 
-	p.expect(.leftparen)
 	mut args := []Expr{}
 	for p.peek().kind != .rightparen {
 		args << p.parse_expr(.lowest)
@@ -242,7 +320,24 @@ fn (mut p Parser) parse_call(callee string) FnCall {
 	p.expect(.rightparen)
 
 	return FnCall{
-		name: callee
+		callee: left_expr
+		args: args
+	}
+}
+
+fn (mut p Parser) parse_class_instantiation(name string) ClassInstantiation {
+	p.expect(.leftbrace)
+	mut args := []Expr{}
+	for p.peek().kind != .rightbrace {
+		args << p.parse_expr(.lowest)
+		if p.peek().kind != .rightbrace {
+			p.expect(.comma)
+		}
+	}
+	p.expect(.rightbrace)
+
+	return ClassInstantiation{
+		name: name
 		args: args
 	}
 }
@@ -259,13 +354,15 @@ fn (mut p Parser) parse_type() TypeExpr {
 	mut t := p.peek()
 	if t.kind == .at {
 		p.advance()
-		mut type := p.parse_type()
-		type.ptr_depth++
-		return type
+		mut type_ := p.parse_type()
+		type_.ptr_depth++
+		return type_
+	} else if t.kind == .key_fn {
+		return p.parse_fn_type()
 	}
 	t = p.advance()
 	if t.kind.is_primitive_type() {
-		return TypeExpr{t.lit, 0}
+		return TypeExpr{t.lit, 0, false, [], none}
 	}
 
 	// class types
@@ -274,7 +371,25 @@ fn (mut p Parser) parse_type() TypeExpr {
 		panic("unknown type ${t.lit}")
 	}
 
-	return TypeExpr{t.lit, 0}
+	return TypeExpr{t.lit, 0, false, [], none}
+}
+
+fn (mut p Parser) parse_fn_type() TypeExpr {
+	p.expect(.key_fn)
+	p.expect(.leftparen)
+	mut args := []TypeExpr{}
+
+	for p.peek().kind != .rightparen {
+		args << p.parse_type()
+		if p.peek().kind != .rightparen {
+			p.expect(.comma)
+		}
+	}
+
+	p.expect(.rightparen)
+	p.expect(.colon)
+	ret := p.parse_type()
+	return TypeExpr{is_fn: true, arg_types: args, ret_type: &ret}
 }
 
 // --- parsing stmts
@@ -284,6 +399,7 @@ fn (mut p Parser) parse_stmt() Stmt {
 		.key_let, .key_mut {return p.parse_var_decl()}
 		.key_fn            {return p.parse_fn_decl()}
 		.key_class         {return p.parse_class_decl()}
+		.key_return        {return p.parse_return()}
 		.leftbrace         {return p.parse_block()}
 		else               {return p.parse_expr_stmt()}
 	}
@@ -370,7 +486,6 @@ fn (mut p Parser) parse_fn_decl() FuncDecl {
 		block
 		DeclFlags{}
 	}
-
 }
 
 fn (mut p Parser) parse_class_decl() ClassDecl {
@@ -413,6 +528,17 @@ fn (mut p Parser) parse_member() Member {
 	}
 }
 
+fn (mut p Parser) parse_return() ReturnStmt {
+	p.expect(.key_return)
+	if p.peek().kind == .semicolon {
+		p.advance()
+		return ReturnStmt{VoidExpr{}}
+	}
+	expr := p.parse_expr(.lowest)
+	p.expect(.semicolon)
+	return ReturnStmt{expr}
+}
+
 fn (mut p Parser) parse_block() Block {
 	p.expect(.leftbrace)
 	mut stmts := []Stmt{}
@@ -425,13 +551,11 @@ fn (mut p Parser) parse_block() Block {
 
 	p.expect(.rightbrace)
 
-	scope := p.symbols.current_scope or {panic("no scope for block")}
-
 	p.symbols.exit_scope()
 
 	return Block {
 		stmts: stmts
-		scope: scope
+		scope_idx: p.symbols.current_scope_idx
 	}
 }
 
