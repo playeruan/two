@@ -1,7 +1,7 @@
 module two
 
-type Expr = VoidExpr | UnaryExpr | BinaryExpr | IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | VarExpr | TypeExpr | ParenExpr | RefExpr | DerefExpr | FnCall
-type LiteralExpr = IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral
+type Expr = VoidExpr | UnaryExpr | BinaryExpr | IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | VarExpr | TypeExpr | ParenExpr | RefExpr | DerefExpr | FnCall | ClassInstantiation
+type LiteralExpr = IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | ClassInstantiation
 
 struct VoidExpr {}
 
