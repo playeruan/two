@@ -305,6 +305,8 @@ fn (mut p Parser) parse_fn_decl() FuncDecl {
 
 	p.expect(.leftparen)
 
+	p.symbols.enter_scope()
+
 	mut args := []ArgDecl{}
 	for p.peek().kind != .rightparen {
 		mut is_const:= false
@@ -319,12 +321,12 @@ fn (mut p Parser) parse_fn_decl() FuncDecl {
 		if p.peek().kind != .rightparen {
 			p.expect(.comma)
 		}
+		flags := DeclFlags {const: is_const}
+		p.symbols.define_var(ident_tok.lit, type_expr, flags)
 		args << ArgDecl{
 			name: ident_tok.lit
 			type: type_expr
-			flags: DeclFlags{
-				const: is_const
-			}
+			flags: flags
 		}
 	}
 
@@ -333,6 +335,7 @@ fn (mut p Parser) parse_fn_decl() FuncDecl {
 
 	ret_type := p.parse_type()
 	block := p.parse_block()
+	p.symbols.exit_scope()
 
 	return FuncDecl {
 		name_tok.lit

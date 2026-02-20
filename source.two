@@ -1,4 +1,4 @@
-fn foo(const x: @f32, y: @@bool): i32 {
-  mut ciao: i32 = 5;
+fn foo(const x: @i32, y: @@bool): i32 {
+  mut ciao: i32 = deref(x);
   mut ciaop: @i32 = addr(ciao);
 }
