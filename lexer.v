@@ -93,7 +93,7 @@ fn (mut l Lexer) lex_ident() Token {
 	return l.tok(kind, lit)
 }
 
-const delimiters := ",;.:+-*/%#()[]{}<>=|&^|@\n\" "
+const delimiters := ",;.:+-*/%#()[]{}<>=|&^|@-\n\" "
 fn (mut l Lexer) lex_delimiter() Token {
 	start := l.pos
 	l.advance()

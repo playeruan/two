@@ -1,4 +1,3 @@
-fn foo(f: @fn(): void): fn(): i32 {return fn(): i32 {return 1;};}
-let vf: fn(): void = fn(): void {};
-let x: i32 = foo(addr(vf))();
+let t: fn() -> i32 = fn() -> i32 {return 1;};
+
 

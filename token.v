@@ -42,6 +42,7 @@ enum TokKind as u8 {
 	dot
 	comma
 	colon
+	arrow
 	semicolon
 	at
 	increment
@@ -82,7 +83,7 @@ fn (ts []Token) str() string {
 }
 
 fn (t Token) str() string {
-  return "${t.kind.str()} (${t.lit})"
+  return "${t.kind.str()} \"${t.lit}\""
 }
 
 fn (tk TokKind) get_prec() Precedence {
@@ -131,6 +132,7 @@ fn get_kind_if_delimiter(s string) ?TokKind {
 		":"  {.colon}
 		";"  {.semicolon}
 		"@"  {.at}
+		"->" {.arrow}
 		else {none}
 	}
 }

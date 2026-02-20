@@ -237,6 +237,7 @@ fn (mut p Parser) parse_expr(prec Precedence) Expr {
 fn (mut p Parser) parse_primary() Expr {
 	t := p.advance()
 
+	dump(t.kind)
 	return match t.kind {
 		.integer_lit {IntegerLiteral{t.lit.i64()}}
 		.float_lit   {FloatLiteral{t.lit.f64()}}
@@ -286,7 +287,7 @@ fn (mut p Parser) parse_lambda() LambdaExpr {
 		}
   }
   p.expect(.rightparen)
-  p.expect(.colon)
+  p.expect(.arrow)
   ret_type := p.parse_type()
   block := p.parse_block()
 
@@ -387,7 +388,7 @@ fn (mut p Parser) parse_fn_type() TypeExpr {
 	}
 
 	p.expect(.rightparen)
-	p.expect(.colon)
+	p.expect(.arrow)
 	ret := p.parse_type()
 	return TypeExpr{is_fn: true, arg_types: args, ret_type: &ret}
 }
@@ -468,7 +469,7 @@ fn (mut p Parser) parse_fn_decl() FuncDecl {
 	}
 
 	p.expect(.rightparen)
-	p.expect(.colon)
+	p.expect(.arrow)
 
 	ret_type := p.parse_type()
 

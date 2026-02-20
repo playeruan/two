@@ -195,7 +195,6 @@ fn (mut t SymbolTable) lookup_var(name string) ?VarSymbol {
 		if name in scope.vars {
 			unsafe {return scope.vars[name]}
 		}
-		dump(idx)
 		idx = scope.parent_idx
 	}
 	return none
