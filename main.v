@@ -14,4 +14,5 @@ fn main() {
 	mut c := two.Checker{table: table}
 	c.check(ast)
 	println("all types are correct :D")
+	//println(table)
 }

@@ -1,6 +1,6 @@
 module two
 
-type Expr = VoidExpr | UnaryExpr | BinaryExpr | IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | VarExpr | TypeExpr | ParenExpr | RefExpr | DerefExpr
+type Expr = VoidExpr | UnaryExpr | BinaryExpr | IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | VarExpr | TypeExpr | ParenExpr | RefExpr | DerefExpr | FnCall
 type LiteralExpr = IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral
 
 struct VoidExpr {}
@@ -55,6 +55,11 @@ struct DerefExpr {
 	expr Expr
 }
 
+struct FnCall {
+	name string
+	args []Expr
+}
+
 fn (e Expr) is_literal() bool {
 	return match e {
 		IntegerLiteral, FloatLiteral,
@@ -73,7 +78,6 @@ struct DeclFlags {
 	const bool
 	mutable bool
 	public bool
-	abstract bool
 }
 
 fn (f DeclFlags) str() string {
@@ -86,9 +90,6 @@ fn (f DeclFlags) str() string {
 	}
 	if f.public {
 		s+="public "
-	}
-	if f.abstract {
-		s+="abstract "
 	}
 	if s=="" {
 		s+="none"
@@ -228,9 +229,22 @@ fn (mut p Parser) parse_ident(ident string) Expr {
 	}
 }
 
-fn (mut p Parser) parse_call(callee string) Expr {
-	panic("todo")
-	return Expr{}
+fn (mut p Parser) parse_call(callee string) FnCall {
+
+	p.expect(.leftparen)
+	mut args := []Expr{}
+	for p.peek().kind != .rightparen {
+		args << p.parse_expr(.lowest)
+		if p.peek().kind != .rightparen {
+			p.expect(.comma)
+		}
+	}
+	p.expect(.rightparen)
+
+	return FnCall{
+		name: callee
+		args: args
+	}
 }
 
 fn (mut p Parser) parse_access(expr Expr) Expr {return Expr{}}
@@ -253,8 +267,14 @@ fn (mut p Parser) parse_type() TypeExpr {
 	if t.kind.is_primitive_type() {
 		return TypeExpr{t.lit, 0}
 	}
+
 	// class types
-	return TypeExpr{'void', 0}
+	csym := p.symbols.lookup_class(t.lit)
+	if csym == none {
+		panic("unknown type ${t.lit}")
+	}
+
+	return TypeExpr{t.lit, 0}
 }
 
 // --- parsing stmts
@@ -263,6 +283,7 @@ fn (mut p Parser) parse_stmt() Stmt {
 	match p.peek().kind {
 		.key_let, .key_mut {return p.parse_var_decl()}
 		.key_fn            {return p.parse_fn_decl()}
+		.key_class         {return p.parse_class_decl()}
 		.leftbrace         {return p.parse_block()}
 		else               {return p.parse_expr_stmt()}
 	}
@@ -334,8 +355,13 @@ fn (mut p Parser) parse_fn_decl() FuncDecl {
 	p.expect(.colon)
 
 	ret_type := p.parse_type()
+
+	p.symbols.declare_func(name_tok.lit, args)
+
 	block := p.parse_block()
 	p.symbols.exit_scope()
+
+	p.symbols.define_func(name_tok.lit, ret_type, DeclFlags{}, block, args)
 
 	return FuncDecl {
 		name_tok.lit
@@ -345,6 +371,46 @@ fn (mut p Parser) parse_fn_decl() FuncDecl {
 		DeclFlags{}
 	}
 
+}
+
+fn (mut p Parser) parse_class_decl() ClassDecl {
+	p.expect(.key_class)
+	ident_tok := p.peek()
+	p.expect(.identifier)
+
+	p.expect(.leftbrace)
+
+	p.symbols.declare_class(ident_tok.lit)
+
+	mut members := []Member{}
+	for p.peek().kind != .rightbrace && p.peek().kind != .eof {
+		members << p.parse_member()
+	}
+
+	p.expect(.rightbrace)
+
+	p.symbols.define_class(ident_tok.lit, members)
+
+	return ClassDecl {
+		ident_tok.lit
+		members
+		DeclFlags {}
+	}
+}
+
+fn (mut p Parser) parse_member() Member {
+	ident_tok := p.peek()
+	p.expect(.identifier)
+
+	p.expect(.colon)
+	type_expr := p.parse_type()
+	p.expect(.semicolon)
+
+	return Member {
+		ident_tok.lit
+		type_expr
+		DeclFlags {}
+	}
 }
 
 fn (mut p Parser) parse_block() Block {

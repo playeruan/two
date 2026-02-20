@@ -1,4 +1,19 @@
-fn foo(const x: @i32, y: @@bool): i32 {
-  mut ciao: i32 = deref(x);
-  mut ciaop: @i32 = addr(ciao);
+
+let g: f32 = 1.0;
+let l: i32 = 6;
+
+class Vec2 {
+  x: i32;
+  y: i32;
 }
+
+class Entity {
+  pos: Vec2;
+  parent: @Entity;
+}
+
+fn getparent(p: i32, e: @f32): Entity {
+  let x: i32 = 6;
+}
+
+getparent(38, g);
