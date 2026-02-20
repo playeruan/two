@@ -84,7 +84,7 @@ fn (mut l Lexer) lex_number() Token {
 
 fn (mut l Lexer) lex_ident() Token {
 	start := l.pos
-	for !l.is_at_end() && l.peek().is_alnum() {
+	for !l.is_at_end() && (l.peek().is_alnum() || l.peek() == `_`) {
 		l.advance()
 	}
 
