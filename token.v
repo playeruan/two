@@ -35,6 +35,10 @@ enum TokKind as u8 {
 	eqeq
 	lteq
 	gteq
+	pluseq
+	minuseq
+	stareq
+	slasheq
 	plus
 	minus
 	star
@@ -115,6 +119,10 @@ fn get_kind_if_delimiter(s string) ?TokKind {
 		"==" {.eqeq}
 		"<=" {.lteq}
 		">=" {.gteq}
+		"+=" {.pluseq}
+		"-=" {.minuseq}
+		"*=" {.stareq}
+		"/=" {.slasheq}
 		"+"  {.plus}
 		"-"  {.minus}
 		"*"  {.star}

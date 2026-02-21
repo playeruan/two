@@ -1,6 +1,9 @@
 module two
 
-type Expr = VoidExpr | UnaryExpr | BinaryExpr | IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | VarExpr | TypeExpr | ParenExpr | RefExpr | DerefExpr | FnCall | ClassInstantiation | NullptrExpr | LambdaExpr
+type Expr = VoidExpr | UnaryExpr | BinaryExpr | IntegerLiteral | FloatLiteral | ArrayLiteral |
+						StringLiteral | BoolLiteral | VarExpr | TypeExpr | ParenExpr | RefExpr |
+						DerefExpr | FnCall | ClassInstantiation | NullptrExpr | LambdaExpr | IndexExpr |
+						AccessExpr | CastExpr
 type LiteralExpr = IntegerLiteral | FloatLiteral | StringLiteral | BoolLiteral | ClassInstantiation | NullptrExpr
 
 struct VoidExpr {}
@@ -34,6 +37,10 @@ struct BoolLiteral {
 	val bool
 }
 
+struct ArrayLiteral {
+	vals []Expr
+}
+
 struct VarExpr {
 	name string
 }
@@ -41,10 +48,16 @@ struct VarExpr {
 struct TypeExpr {
 	name string
 mut:
+	// ptr
 	ptr_depth int
+	pointed_flags DeclFlags
+	// fn
 	is_fn bool
 	arg_types []TypeExpr
 	ret_type ?&TypeExpr
+	// array
+	is_array bool
+	elem_type ?&TypeExpr
 }
 
 struct ParenExpr {
@@ -72,6 +85,21 @@ mut:
 	internal_name string
 }
 
+struct IndexExpr {
+	left Expr
+	idx Expr
+}
+
+struct AccessExpr {
+	left Expr
+	member_name string
+}
+
+struct CastExpr {
+	expr Expr
+	to TypeExpr
+}
+
 struct ClassInstantiation {
 	name string
 	args []Expr
@@ -93,9 +121,12 @@ fn (te TypeExpr) str() string {
 		for t in te.arg_types {
 			s += t.str()
 		}
-		ret_t := *te.ret_type or {&TypeExpr{'void', 0, false, [], none}}
+		ret_t := *te.ret_type or {&TypeExpr{name: 'void'}}
 		s += ") -> " + ret_t.str()
 		return s
+	} else if te.is_array {
+		elem_t := *te.elem_type or {&TypeExpr{name: 'void'}}
+		return "[]" + elem_t.str()
 	}
 	return ("@".repeat(te.ptr_depth))+te.name
 }
@@ -126,7 +157,7 @@ fn (f DeclFlags) str() string {
 }
 
 type Stmt = VarDecl | FuncDecl | ClassDecl | ArgDecl |
-						ExprStmt | Member | Block | ReturnStmt
+						ExprStmt | Member | Block | ReturnStmt | MethodDecl
 
 struct VarDecl {
 	name string
@@ -141,6 +172,15 @@ struct FuncDecl {
 	args []ArgDecl
 	block Block
 	flags DeclFlags
+}
+
+struct MethodDecl {
+	name string
+	type TypeExpr
+	args []ArgDecl
+	block Block
+	flags DeclFlags
+	class_name string
 }
 
 struct ClassDecl {
@@ -224,8 +264,11 @@ fn (mut p Parser) parse_expr(prec Precedence) Expr {
 		expr = match op_tok.kind {
 			.dot {p.parse_access(expr)}
 			.increment, .decrement {UnaryExpr{expr, op_tok.lit, false}}
-			.leftparen {
-				p.parse_call(expr)
+			.leftparen {p.parse_call(expr)}
+			.leftsquare {
+				index_expr := p.parse_expr(.lowest)
+				p.expect(.rightsquare)
+				IndexExpr{left: expr, idx: index_expr}
 			}
 			else {p.parse_binary(expr, op_tok.lit, op_tok.kind.get_prec())}
 		}
@@ -235,8 +278,17 @@ fn (mut p Parser) parse_expr(prec Precedence) Expr {
 }
 
 fn (mut p Parser) parse_primary() Expr {
-	t := p.advance()
+	t := p.peek()
 
+	if t.kind == .at || t.kind == .leftsquare || t.kind.is_primitive_type() {
+		type_ := p.parse_type()
+		p.expect(.leftparen)
+		inner := p.parse_expr(.lowest)
+		p.expect(.rightparen)
+		return CastExpr{expr: inner, to: type_}
+	}
+
+	p.advance()
 	return match t.kind {
 		.integer_lit {IntegerLiteral{t.lit.i64()}}
 		.float_lit   {FloatLiteral{t.lit.f64()}}
@@ -247,7 +299,8 @@ fn (mut p Parser) parse_primary() Expr {
 		.key_addr    {p.parse_addr()}
 		.key_deref   {p.parse_deref()}
 		.key_fn      {p.parse_lambda()}
-		else {panic("error here")}
+		.leftsquare  {p.parse_arr_lit()}
+		else {panic("unexpected token kind ${t.kind}")}
 	}
 }
 
@@ -304,6 +357,12 @@ fn (mut p Parser) parse_ident(ident string) Expr {
 			p.advance()
 			p.parse_call(VarExpr{name: ident})
 		}
+		.leftsquare {
+			p.expect(.leftsquare)
+			index_expr := p.parse_expr(.lowest)
+			p.expect(.rightsquare)
+			IndexExpr{left: VarExpr{name: ident}, idx: index_expr}
+		}
 		else       {VarExpr{name: ident}}
 	}
 }
@@ -342,7 +401,18 @@ fn (mut p Parser) parse_class_instantiation(name string) ClassInstantiation {
 	}
 }
 
-fn (mut p Parser) parse_access(expr Expr) Expr {return Expr{}}
+fn (mut p Parser) parse_access(left Expr) AccessExpr {
+
+	member := p.peek()
+	p.expect(.identifier)
+
+	return AccessExpr{
+		left: left
+		member_name: member.lit
+	}
+
+}
+
 fn (mut p Parser) parse_unary_l(expr Expr) Expr {return Expr{}}
 
 fn (mut p Parser) parse_binary(left Expr, op string, prec Precedence) BinaryExpr {
@@ -359,10 +429,19 @@ fn (mut p Parser) parse_type() TypeExpr {
 		return type_
 	} else if t.kind == .key_fn {
 		return p.parse_fn_type()
+	} else if t.kind == .leftsquare {
+		p.expect(.leftsquare)
+		p.expect(.rightsquare)
+		elem_type := p.parse_type()
+		return TypeExpr{
+			name: "array"
+			is_array: true
+			elem_type: &elem_type
+		}
 	}
 	t = p.advance()
 	if t.kind.is_primitive_type() {
-		return TypeExpr{t.lit, 0, false, [], none}
+		return TypeExpr{name: t.lit}
 	}
 
 	// class types
@@ -371,7 +450,7 @@ fn (mut p Parser) parse_type() TypeExpr {
 		panic("unknown type ${t.lit}")
 	}
 
-	return TypeExpr{t.lit, 0, false, [], none}
+	return TypeExpr{name: t.lit}
 }
 
 fn (mut p Parser) parse_fn_type() TypeExpr {
@@ -390,6 +469,18 @@ fn (mut p Parser) parse_fn_type() TypeExpr {
 	p.expect(.arrow)
 	ret := p.parse_type()
 	return TypeExpr{is_fn: true, arg_types: args, ret_type: &ret}
+}
+
+fn (mut p Parser) parse_arr_lit() ArrayLiteral {
+	mut exprs := []Expr{}
+	for p.peek().kind != .rightsquare {
+		exprs << p.parse_expr(.lowest)
+		if p.peek().kind != .rightsquare{
+			p.expect(.comma)
+		}
+	}
+	p.expect(.rightsquare)
+	return ArrayLiteral{ vals: exprs }
 }
 
 // --- parsing stmts
@@ -433,8 +524,23 @@ fn (mut p Parser) parse_var_decl() VarDecl {
 	}
 }
 
-fn (mut p Parser) parse_fn_decl() FuncDecl {
+fn (mut p Parser) parse_fn_decl() Stmt {
 	p.advance()
+
+	mut class_name := ""
+	mut args := []ArgDecl{}
+
+
+	if p.peek().kind == .leftparen {
+
+		p.advance()
+		class_name = p.peek().lit
+
+		p.expect(.identifier)
+		p.expect(.rightparen)
+
+	}
+
 	name_tok := p.advance()
 	if name_tok.kind != .identifier {
 		panic("expected identifier after fn, got ${name_tok.lit}")
@@ -442,9 +548,22 @@ fn (mut p Parser) parse_fn_decl() FuncDecl {
 
 	p.expect(.leftparen)
 
+
 	p.symbols.enter_scope()
 
-	mut args := []ArgDecl{}
+	if class_name != "" {
+		this_type := TypeExpr{
+			name: class_name
+			ptr_depth: 1
+		}
+		p.symbols.define_var('this', this_type, DeclFlags{})
+		args << ArgDecl{
+			name: 'this'
+			type: this_type
+			flags: DeclFlags{}
+		}
+	}
+
 	for p.peek().kind != .rightparen {
 		mut is_const:= false
 		if p.peek().kind == .key_const {
@@ -472,13 +591,29 @@ fn (mut p Parser) parse_fn_decl() FuncDecl {
 
 	ret_type := p.parse_type()
 
-	p.symbols.declare_func(name_tok.lit, args)
+	if class_name != "" {
+		p.symbols.declare_method(class_name, name_tok.lit, args)
+	} else {
+		p.symbols.declare_func(name_tok.lit, args)
+	}
 
 	block := p.parse_block()
 	p.symbols.exit_scope()
 
-	p.symbols.define_func(name_tok.lit, ret_type, DeclFlags{}, block, args)
 
+	if class_name != "" {
+		p.symbols.define_method(class_name, name_tok.lit, ret_type, DeclFlags{}, block, args)
+		return MethodDecl{
+			name_tok.lit
+			ret_type
+			args
+			block
+			DeclFlags{}
+			class_name
+		}
+	}
+
+	p.symbols.define_func(name_tok.lit, ret_type, DeclFlags{}, block, args)
 	return FuncDecl {
 		name_tok.lit
 		ret_type
@@ -544,6 +679,7 @@ fn (mut p Parser) parse_block() Block {
 	mut stmts := []Stmt{}
 
 	p.symbols.enter_scope()
+	block_scope_idx := p.symbols.current_scope_idx
 
 	for p.peek().kind != .rightbrace && p.peek().kind != .eof {
 		stmts << p.parse_stmt()
@@ -555,7 +691,7 @@ fn (mut p Parser) parse_block() Block {
 
 	return Block {
 		stmts: stmts
-		scope_idx: p.symbols.current_scope_idx
+		scope_idx: block_scope_idx
 	}
 }
 
@@ -569,6 +705,7 @@ fn (mut p Parser) parse_expr_stmt() ExprStmt {
 
 pub fn (mut p Parser) parse_program(ts []Token) ([]Stmt, SymbolTable){
 	p.ts = ts
+	p.symbols.register_builtins()
 	p.symbols.enter_scope()
 	for p.peek().kind != .eof {
 		p.stmts << p.parse_stmt()

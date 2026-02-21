@@ -1,13 +1,6 @@
+let x: u8 = 1111;
+let a: f64 = 0;
 
-class Entity {
-  parent: @Entity;
-  name  :  string;
+fn test() -> u64 {
+  return 1;
 }
-
-fn get_update(e: Entity) -> fn(Entity) -> void {
-  return fn(e_: Entity) -> void {};
-}
-
-let e: Entity = Entity{nullptr, "nome"};
-let update: fn(Entity) -> void = get_update(e);
-update(e);
