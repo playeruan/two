@@ -70,7 +70,7 @@ fn (mut t SymbolTable) register_builtins() {
       'append': FuncSymbol{
       	name: 'append'
 				args: {
-					'this': VarSymbol{name: 'this', type: TypeExpr{name: 'array', ptr_depth: 1, is_array: true}}
+					'this': VarSymbol{name: 'this', type: TypeExpr{name: 'array', ptr_depth: 1, is_array: true}, flags: DeclFlags{mutable: true}}
 					'what': VarSymbol{name: 'what', type: TypeExpr{name: '__generic__'}}
 				}
 				type: TypeExpr{
@@ -85,7 +85,7 @@ fn (mut t SymbolTable) register_builtins() {
 			'pop': FuncSymbol {
 				name: 'pop'
 				args: {
-					'this': VarSymbol{name: 'this', type: TypeExpr{name: 'array', ptr_depth: 1, is_array: true}}
+					'this': VarSymbol{name: 'this', type: TypeExpr{name: 'array', ptr_depth: 1, is_array: true}, flags: DeclFlags{mutable: true}}
 				}
 				type: TypeExpr {
 					is_fn: true

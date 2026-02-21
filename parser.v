@@ -280,12 +280,15 @@ fn (mut p Parser) parse_expr(prec Precedence) Expr {
 fn (mut p Parser) parse_primary() Expr {
 	t := p.peek()
 
-	if t.kind == .at || t.kind == .leftsquare || t.kind.is_primitive_type() {
+	if t.kind.is_primitive_type() {
 		type_ := p.parse_type()
-		p.expect(.leftparen)
-		inner := p.parse_expr(.lowest)
-		p.expect(.rightparen)
-		return CastExpr{expr: inner, to: type_}
+		if p.peek().kind == .leftparen {
+			p.advance()
+			inner := p.parse_expr(.lowest)
+			p.expect(.rightparen)
+			return CastExpr{expr: inner, to: type_}
+		}
+		return type_
 	}
 
 	p.advance()
@@ -348,8 +351,16 @@ fn (mut p Parser) parse_lambda() LambdaExpr {
 
 fn (mut p Parser) parse_ident(ident string) Expr {
 
-	if p.symbols.lookup_class(ident) != none && p.peek().kind == .leftbrace {
-		return p.parse_class_instantiation(ident)
+	if p.symbols.lookup_class(ident) != none {
+		if p.peek().kind == .leftbrace {
+			return p.parse_class_instantiation(ident)
+		}
+		if p.peek().kind == .leftparen {
+			p.advance()
+			inner := p.parse_expr(.lowest)
+			p.expect(.rightparen)
+			return CastExpr{expr: inner, to: TypeExpr{name: ident}}
+		}
 	}
 
 	return match p.peek().kind {
@@ -556,11 +567,11 @@ fn (mut p Parser) parse_fn_decl() Stmt {
 			name: class_name
 			ptr_depth: 1
 		}
-		p.symbols.define_var('this', this_type, DeclFlags{})
+		p.symbols.define_var('this', this_type, DeclFlags{mutable: true})
 		args << ArgDecl{
 			name: 'this'
 			type: this_type
-			flags: DeclFlags{}
+			flags: DeclFlags{mutable: true}
 		}
 	}
 
@@ -649,6 +660,10 @@ fn (mut p Parser) parse_class_decl() ClassDecl {
 }
 
 fn (mut p Parser) parse_member() Member {
+
+	is_mut := p.peek().kind == .key_mut
+	if is_mut {p.advance()}
+
 	ident_tok := p.peek()
 	p.expect(.identifier)
 
@@ -659,7 +674,7 @@ fn (mut p Parser) parse_member() Member {
 	return Member {
 		ident_tok.lit
 		type_expr
-		DeclFlags {}
+		DeclFlags {mutable: is_mut}
 	}
 }
 

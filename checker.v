@@ -298,7 +298,7 @@ fn (mut c Checker) check_fn_call(expr FnCall) TypeExpr {
 		passed_type := c.check_expr(arg_expr)
 		expected_type := callee_type.arg_types[i]
 
-		if !do_types_match(passed_type, expected_type) {
+		if !can_cast(passed_type, expected_type) {
 			panic("Argument ${i+1} mismatch: expected ${expected_type.str()}, got ${passed_type.str()}")
 		}
 	}
@@ -318,7 +318,7 @@ fn (mut c Checker) check_class_inst(expr ClassInstantiation) TypeExpr {
 	for i < expr.args.len {
 		argtype := c.check_expr(expr.args[i])
 		reqtype:= sym.members.values()[i].type
-		if !do_types_match(argtype, reqtype) {
+		if !can_cast(argtype, reqtype) {
 			panic("member ${i+1} for class ${expr.name}() \
 			should be $reqtype, got $argtype")
 		}

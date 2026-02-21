@@ -1,6 +1,23 @@
-let x: u8 = 1111;
-let a: f64 = 0;
 
-fn test() -> u64 {
-  return 1;
+class Persona {
+  nome: string;
+  mut eta: u8;
+  azione: fn() -> void;
 }
+
+fn saluta() -> void {
+
+}
+
+fn (Persona) invecchia() -> void {
+  this.eta++;
+}
+
+fn invecchia2(p: @Persona) -> void {
+  deref(p).eta++;
+}
+
+mut danilo: Persona = Persona{"SirDany", 15, saluta};
+danilo.invecchia();
+invecchia2(addr(danilo));
+
