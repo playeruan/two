@@ -136,7 +136,7 @@ fn (te TypeExpr) str() string {
 struct DeclFlags {
 	const bool
 	mutable bool
-	public bool
+	export bool
 }
 
 fn (f DeclFlags) str() string {
@@ -147,8 +147,8 @@ fn (f DeclFlags) str() string {
 	if f.mutable {
 		s+="mutable "
 	}
-	if f.public {
-		s+="public "
+	if f.export {
+		s+="export "
 	}
 	if s=="" {
 		s+="none"
@@ -157,7 +157,8 @@ fn (f DeclFlags) str() string {
 }
 
 type Stmt = VarDecl | FuncDecl | ClassDecl | ArgDecl |
-						ExprStmt | Member | Block | ReturnStmt | MethodDecl
+						ExprStmt | Member | Block | ReturnStmt | MethodDecl |
+						IfStmt | ElseStmt | ElifStmt | IfChain
 
 struct VarDecl {
 	name string
@@ -214,6 +215,26 @@ struct ReturnStmt {
 	expr Expr
 }
 
+struct IfStmt {
+	guard Expr
+	block Block
+}
+
+struct ElifStmt {
+	guard Expr
+	block Block
+}
+
+struct ElseStmt {
+	block Block
+}
+
+struct IfChain {
+	if    IfStmt
+	elifs []ElifStmt
+	else  ?ElseStmt
+}
+
 fn (b Block) get_all_returns() []ReturnStmt {
 	mut returns := []ReturnStmt{}
 	for stmt in b.stmts {
@@ -221,9 +242,44 @@ fn (b Block) get_all_returns() []ReturnStmt {
 			returns << stmt
 		} else if stmt is Block {
 			returns << stmt.get_all_returns()
+		} else if stmt is IfChain {
+			returns << stmt.if.block.get_all_returns()
+			for elifstmt in stmt.elifs {returns << elifstmt.block.get_all_returns()}
+			if stmt.else != none {returns << stmt.else.block.get_all_returns()}
 		}
 	}
 	return returns
+}
+
+fn always_returns(s Stmt) bool {
+	return match s {
+		ReturnStmt {true}
+		IfChain    {
+			mut always := true
+
+			if !always_returns(s.if.block) {always = false}
+			if s.else == none {always = false}
+			else {
+				if !always_returns(s.else.block) {
+					always = false
+				}
+			}
+			for elifst in s.elifs {
+				if !always_returns(elifst.block) {always = false}
+			}
+			always
+		}
+		Block      {
+			mut ato := false
+			for stmt in s.stmts {
+				if always_returns(stmt) {
+					ato = true
+				}
+			}
+			ato
+		}
+		else       {false}
+	}
 }
 
 // ---------------------------------
@@ -303,6 +359,7 @@ fn (mut p Parser) parse_primary() Expr {
 		.key_deref   {p.parse_deref()}
 		.key_fn      {p.parse_lambda()}
 		.leftsquare  {p.parse_arr_lit()}
+		.minus       {UnaryExpr{expr: p.parse_expr(.prefix), op: '-', prefix: true}}
 		else {panic("unexpected token kind ${t.kind}")}
 	}
 }
@@ -362,7 +419,6 @@ fn (mut p Parser) parse_ident(ident string) Expr {
 			return CastExpr{expr: inner, to: TypeExpr{name: ident}}
 		}
 	}
-
 	return match p.peek().kind {
 		.leftparen {
 			p.advance()
@@ -498,12 +554,13 @@ fn (mut p Parser) parse_arr_lit() ArrayLiteral {
 
 fn (mut p Parser) parse_stmt() Stmt {
 	match p.peek().kind {
-		.key_let, .key_mut {return p.parse_var_decl()}
-		.key_fn            {return p.parse_fn_decl()}
-		.key_class         {return p.parse_class_decl()}
-		.key_return        {return p.parse_return()}
-		.leftbrace         {return p.parse_block()}
-		else               {return p.parse_expr_stmt()}
+		.key_let, .key_mut   {return p.parse_var_decl()}
+		.key_fn, .key_export {return p.parse_fn_decl()}
+		.key_class           {return p.parse_class_decl()}
+		.key_return          {return p.parse_return()}
+		.leftbrace           {return p.parse_block()}
+		.key_if              {return p.parse_if()}
+		else                 {return p.parse_expr_stmt()}
 	}
 }
 
@@ -536,6 +593,10 @@ fn (mut p Parser) parse_var_decl() VarDecl {
 }
 
 fn (mut p Parser) parse_fn_decl() Stmt {
+	is_export := p.peek().kind == .key_export
+	if is_export {
+		p.advance()
+	}
 	p.advance()
 
 	mut class_name := ""
@@ -619,7 +680,7 @@ fn (mut p Parser) parse_fn_decl() Stmt {
 			ret_type
 			args
 			block
-			DeclFlags{}
+			DeclFlags{export: is_export}
 			class_name
 		}
 	}
@@ -630,7 +691,34 @@ fn (mut p Parser) parse_fn_decl() Stmt {
 		ret_type
 		args
 		block
-		DeclFlags{}
+		DeclFlags{export: is_export}
+	}
+}
+
+fn (mut p Parser) parse_if() IfChain {
+	p.expect(.key_if)
+	guard := p.parse_expr(.lowest)
+	block := p.parse_block()
+	ifstmt := IfStmt{guard: guard, block: block}
+
+	mut elifstmts := []ElifStmt{}
+	for p.peek().kind == .key_elif {
+		p.expect(.key_elif)
+		g := p.parse_expr(.lowest)
+		b := p.parse_block()
+		elifstmts << ElifStmt{guard: g, block: b}
+	}
+
+	mut elsestmt := ?ElseStmt(none)
+	if p.peek().kind == .key_else {
+		p.expect(.key_else)
+		elsestmt = ElseStmt{block: p.parse_block()}
+	}
+
+	return IfChain{
+		if: ifstmt
+		elifs: elifstmts
+		else: elsestmt
 	}
 }
 

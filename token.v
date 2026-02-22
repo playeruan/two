@@ -5,6 +5,7 @@ enum TokKind as u8 {
 	key_mut
 	key_const
 	key_class
+	key_export
 	key_fn
 	key_void
 	key_i8
@@ -25,6 +26,9 @@ enum TokKind as u8 {
 	key_deref
 	key_nullptr
 	key_return
+	key_if
+	key_else
+	key_elif
 	integer_lit
 	float_lit
 	string_lit
@@ -33,6 +37,7 @@ enum TokKind as u8 {
 	lt
 	gt
 	eqeq
+	neq
 	lteq
 	gteq
 	pluseq
@@ -92,8 +97,8 @@ fn (t Token) str() string {
 
 fn (tk TokKind) get_prec() Precedence {
 	return match tk {
-		.eq {.assigment}
-		.eqeq, .lteq, .gteq, .lt, .gt {.comparison}
+		.eq, .pluseq, .minuseq, .stareq, .slasheq {.assigment}
+		.eqeq, .lteq, .gteq, .lt, .gt, .neq {.comparison}
 		.plus, .minus {.sum}
 		.star, .slash {.product}
 		.dot {.access}
@@ -117,6 +122,7 @@ fn get_kind_if_delimiter(s string) ?TokKind {
 		"<"  {.lt}
 		">"  {.gt}
 		"==" {.eqeq}
+		"!=" {.neq}
 		"<=" {.lteq}
 		">=" {.gteq}
 		"+=" {.pluseq}
@@ -171,6 +177,10 @@ fn get_kind_if_key(s string) ?TokKind {
 		"fn"    {.key_fn}
 		"nullptr" {.key_nullptr}
 		"return"  {.key_return}
+		"export"  {.key_export}
+		"if"      {.key_if}
+		"else"    {.key_else}
+		"elif"    {.key_elif}
 		else  {none}
 	}
 }

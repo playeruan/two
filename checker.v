@@ -219,6 +219,10 @@ fn (mut c Checker) check_binary_expr(bin BinaryExpr) TypeExpr {
 	}
 	assert_types_match(left_type, right_type)
 
+	if ["<", ">", "<=", ">=", "==", "!="].contains(bin.op) {
+		return TypeExpr{name: 'bool', ptr_depth: 0}
+	}
+
 	return left_type
 }
 
@@ -338,6 +342,23 @@ fn (mut c Checker) check_stmt(stmt Stmt) {
 		ClassDecl{c.check_class_decl(stmt)}
 		Block    {c.check_block(stmt)}
 		ExprStmt {c.check_expr(stmt.expr)}
+		IfChain  {
+			c.check_stmt(stmt.if)
+			for elif in stmt.elifs {
+				c.check_stmt(elif)
+			}
+			if stmt.else != none {
+				c.check_stmt(stmt.else)
+			}
+		}
+		IfStmt, ElifStmt {
+			guard_t := c.check_expr(stmt.guard)
+			assert_types_match(guard_t, TypeExpr{name: 'bool', ptr_depth: 0})
+			c.check_block(stmt.block)
+		}
+		ElseStmt {
+			c.check_block(stmt.block)
+		}
 		ReturnStmt {}
 		else     {panic("unhandled")}
 	}
@@ -356,6 +377,10 @@ fn (mut c Checker) check_var_decl(decl VarDecl) {
 fn (mut c Checker) check_func_decl(decl FuncDecl) {
 	c.inside_func = true
 	c.check_block(decl.block)
+
+	if decl.type != TypeExpr{name:'void'} && !always_returns(decl.block) {
+    panic("function ${decl.name} does not return on all paths")
+	}
 
 	prev_scope := c.table.current_scope_idx
   c.table.jump_to_scope(decl.block.scope_idx)
