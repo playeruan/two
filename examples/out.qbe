@@ -1,9 +1,9 @@
 function w $test(w %x_arg) {
 @start
-	%t1 =w loadw %x_arg
-	%t2 =w mul %t1, 2
-	storew %t2, %x_arg
-	%t3 =w loadw %x_arg
+	%t1 =w mul %x_arg, 2
+	%t2_ptr =l alloc4 4
+	storew %t1, %t2_ptr
+	%t3 =w loadw %t2_ptr
 	ret %t3
 }
 export function w $main() {
