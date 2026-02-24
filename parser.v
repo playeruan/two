@@ -637,9 +637,9 @@ fn (mut p Parser) parse_fn_decl() Stmt {
 	}
 
 	for p.peek().kind != .rightparen {
-		mut is_const:= false
-		if p.peek().kind == .key_const {
-			is_const = true
+		mut is_mut:= false
+		if p.peek().kind == .key_mut {
+			is_mut = true
 			p.advance()
 		}
 		ident_tok := p.peek()
@@ -649,7 +649,7 @@ fn (mut p Parser) parse_fn_decl() Stmt {
 		if p.peek().kind != .rightparen {
 			p.expect(.comma)
 		}
-		flags := DeclFlags {const: is_const}
+		flags := DeclFlags {mutable: is_mut}
 		p.symbols.define_var(ident_tok.lit, type_expr, flags)
 		args << ArgDecl{
 			name: ident_tok.lit

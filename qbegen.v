@@ -214,7 +214,7 @@ fn (mut g QbeGen) gen_func(decl FuncDecl) {
 		if arg != decl.args[decl.args.len - 1] {
 			g.buf.write_string(', ')
 		}
-    g.vars_temp_values[arg.name] = GenVal{'%${arg.name}_arg', arg_t, false, arg.type.str()}
+    g.vars_temp_values[arg.name] = GenVal{'%${arg.name}_arg', arg_t, true, arg.type.str()}
 	}
 	g.buf.write_string(') {\n')
 	g.emit_label('@start')

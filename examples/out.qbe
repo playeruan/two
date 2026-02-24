@@ -1,15 +1,13 @@
-function w $randint(w %x_arg) {
+function w $test(w %x_arg) {
 @start
-	%t1_ptr =l alloc4 4
-	storew %x_arg, %t1_ptr
-	%t2 =w loadw %t1_ptr
-	%t3 =w mul %t2, 3
-	storew %t3, %t1_ptr
-	%t4 =w loadw %t1_ptr
-	ret %t4
+	%t1 =w loadw %x_arg
+	%t2 =w mul %t1, 2
+	storew %t2, %x_arg
+	%t3 =w loadw %x_arg
+	ret %t3
 }
-export function $main() {
+export function w $main() {
 @start
-	%t5 =w call $randint(w 1)
-	ret
+	%t4 =w call $test(w 5)
+	ret %t4
 }
