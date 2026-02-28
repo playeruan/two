@@ -6,6 +6,7 @@ enum TokKind as u8 {
 	key_const
 	key_class
 	key_export
+	key_extern
 	key_fn
 	key_void
 	key_i8
@@ -178,6 +179,7 @@ fn get_kind_if_key(s string) ?TokKind {
 		"nullptr" {.key_nullptr}
 		"return"  {.key_return}
 		"export"  {.key_export}
+		"extern"  {.key_extern}
 		"if"      {.key_if}
 		"else"    {.key_else}
 		"elif"    {.key_elif}

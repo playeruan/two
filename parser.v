@@ -137,6 +137,7 @@ struct DeclFlags {
 	const bool
 	mutable bool
 	export bool
+	extern bool
 }
 
 fn (f DeclFlags) str() string {
@@ -360,6 +361,18 @@ fn (mut p Parser) parse_primary() Expr {
 		.key_fn      {p.parse_lambda()}
 		.leftsquare  {p.parse_arr_lit()}
 		.minus       {UnaryExpr{expr: p.parse_expr(.prefix), op: '-', prefix: true}}
+		.at         {
+			mut typ := p.parse_type()
+			if p.peek().kind == .leftparen {
+				p.advance()
+				inner := p.parse_expr(.lowest)
+				p.expect(.rightparen)
+				typ.ptr_depth++
+				CastExpr{expr: inner, to: typ}
+			} else {
+				panic("unexpected token kind ${t.kind}")
+			}
+		}
 		else {panic("unexpected token kind ${t.kind}")}
 	}
 }
@@ -555,7 +568,8 @@ fn (mut p Parser) parse_arr_lit() ArrayLiteral {
 fn (mut p Parser) parse_stmt() Stmt {
 	match p.peek().kind {
 		.key_let, .key_mut   {return p.parse_var_decl()}
-		.key_fn, .key_export {return p.parse_fn_decl()}
+		.key_fn, .key_export, .key_extern
+			{return p.parse_fn_decl()}
 		.key_class           {return p.parse_class_decl()}
 		.key_return          {return p.parse_return()}
 		.leftbrace           {return p.parse_block()}
@@ -594,7 +608,8 @@ fn (mut p Parser) parse_var_decl() VarDecl {
 
 fn (mut p Parser) parse_fn_decl() Stmt {
 	is_export := p.peek().kind == .key_export
-	if is_export {
+	is_extern := p.peek().kind == .key_extern
+	if is_export || is_extern {
 		p.advance()
 	}
 	p.advance()
@@ -667,6 +682,20 @@ fn (mut p Parser) parse_fn_decl() Stmt {
 		p.symbols.declare_method(class_name, name_tok.lit, args)
 	} else {
 		p.symbols.declare_func(name_tok.lit, args)
+	}
+
+	if is_extern {
+		if class_name != "" {
+			panic("extern methods are not supported")
+		}
+		p.symbols.define_func(name_tok.lit, ret_type, DeclFlags{extern: true}, Block{}, args)
+		return FuncDecl {
+			name_tok.lit
+			ret_type
+			args
+			Block{}
+			DeclFlags{extern: true}
+		}
 	}
 
 	block := p.parse_block()

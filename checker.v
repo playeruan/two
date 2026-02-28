@@ -23,12 +23,51 @@ fn do_types_match(t1 TypeExpr, t2 TypeExpr) bool {
 	return true
 }
 
+fn can_implicit_cast(from string, to string) bool {
+	if twotype_bytesize(from) > twotype_bytesize(to) {return false}
+	if is_twotype_float(from) != is_twotype_float(to) {return false}
+	return true
+}
+
+fn assert_can_implicit_cast(from string, to string) {
+	if !can_implicit_cast(from, to) {
+		panic("Cannot implicitly cast $from to $to")
+	}
+}
+
 fn is_nullptr_match(t1 TypeExpr, t2 TypeExpr) bool {
 	if (t1.ptr_depth > 0 && t2.name == 'nullptr') ||
 		 (t2.ptr_depth > 0 && t1.name == 'nullptr') {
 		return true
 	}
 	return false
+}
+
+fn twotype_bytesize(t string) u8 {
+	if t.contains("@") {return 4}
+	return match t {
+		'i8', 'u8' {1}
+		'i16', 'u16' {2}
+		'i32', 'u32', 'f32', 'bool' {4}
+		'i64', 'u64', 'f64' {8}
+		'string' {16}
+		'void' {0}
+		else {panic('unhandled type ${t}')}
+
+	}
+}
+
+
+fn is_twotype_signed(name string) bool {
+	return ![
+		"u8", "u16", "u32", "u64", "bool"
+	].contains(name)
+}
+
+fn is_twotype_float(name string) bool {
+	return [
+		"f32", "f64"
+	].contains(name)
 }
 
 fn (mut c Checker) is_expr_mutable(expr Expr) bool {
@@ -79,6 +118,10 @@ fn (mut c Checker) get_expr_flags(expr Expr) DeclFlags {
 }
 
 fn can_cast(from TypeExpr, to TypeExpr) bool {
+	if from.name == 'string' && to.ptr_depth > 0 && to.name == 'i8' {
+		return true
+	}
+
 	if from.str() == to.str() {
 		return true
 	}
@@ -217,7 +260,13 @@ fn (mut c Checker) check_binary_expr(bin BinaryExpr) TypeExpr {
 	if assignment_ops.contains(bin.op) && !c.is_expr_mutable(bin.left) {
 		panic('expression is immutable')
 	}
-	assert_types_match(left_type, right_type)
+	if !do_types_match(left_type, right_type) {
+		if !(can_implicit_cast(left_type.name, right_type.name)
+			|| can_implicit_cast(right_type.name, left_type.name)) {
+			panic("Cannot implicitly cast expressions in operation \
+						${left_type.name} ${bin.op} ${right_type.name}")
+		}
+	}
 
 	if ["<", ">", "<=", ">=", "==", "!="].contains(bin.op) {
 		return TypeExpr{name: 'bool', ptr_depth: 0}
@@ -375,6 +424,9 @@ fn (mut c Checker) check_var_decl(decl VarDecl) {
 }
 
 fn (mut c Checker) check_func_decl(decl FuncDecl) {
+
+	if decl.flags.extern {return}
+
 	c.inside_func = true
 	c.check_block(decl.block)
 

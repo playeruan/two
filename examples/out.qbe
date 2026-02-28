@@ -1,13 +1,21 @@
-function w $test(w %x_arg) {
-@start
-	%t1 =w mul %x_arg, 2
-	%t2_ptr =l alloc4 4
-	storew %t1, %t2_ptr
-	%t3 =w loadw %t2_ptr
-	ret %t3
-}
+data $glb_1 = { b "What is your name? ", b 0 }
+data $glb_2 = { b "", b 0 }
+data $glb_3 = { b "", b 0 }
+data $glb_4 = { b "%s", b 0 }
+data $glb_5 = { b "Hello %s!\n", b 0 }
 export function w $main() {
 @start
-	%t4 =w call $test(w 5)
-	ret %t4
+	call $printf(l $glb_1, l $glb_2)
+	%t2 =l alloc8 16
+	%t3 =l add %t2, 0
+	storel $glb_3, %t3
+	%t4 =l add %t2, 8
+	storel 0, %t4
+	%t6 =l add %t2, 0
+	%t5 =l loadl %t6
+	call $scanf(l $glb_4, l %t5)
+	%t9 =l add %t2, 0
+	%t8 =l loadl %t9
+	call $printf(l $glb_5, l %t8)
+	ret 0
 }

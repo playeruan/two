@@ -107,6 +107,15 @@ fn (mut l Lexer) lex_delimiter() Token {
 	return l.tok(kind, lit)
 }
 
+fn (mut l Lexer) skip_comment() {
+	l.advance()
+	for l.source[l.pos] != `#` && l.source[l.pos] != 0x0a {
+		l.advance()
+	}
+	l.advance()
+	l.skip_whitespace()
+}
+
 fn (mut l Lexer) next_tok() Token {
 	l.skip_whitespace()
 
@@ -114,7 +123,13 @@ fn (mut l Lexer) next_tok() Token {
 		return l.tok(.eof, "")
 	}
 
-	c := l.peek()
+	mut c := l.peek()
+
+	if c == `#` {
+		l.skip_comment()
+		c = l.peek()
+	}
+
 
 	if c == `"` {
 		return l.lex_string()
