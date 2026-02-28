@@ -63,7 +63,7 @@ fn (mut g QbeGen) load_instr(two_typ string) string {
       'i16' { 'loadsh' }
       'u16' { 'loaduh' }
       'i32', 'u32', 'bool' { 'loadw' }
-      'i64', 'u64' { 'loadl' }
+      'i64', 'u64', 'string' { 'loadl' }
       'f32' { 'loads' }
       'f64' { 'loadd' }
       else  { panic('unhandled type ${two_typ}') }
