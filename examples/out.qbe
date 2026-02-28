@@ -1,21 +1,15 @@
-data $glb_1 = { b "What is your name? ", b 0 }
-data $glb_2 = { b "", b 0 }
-data $glb_3 = { b "", b 0 }
-data $glb_4 = { b "%s", b 0 }
-data $glb_5 = { b "Hello %s!\n", b 0 }
+data $glb_1 = { b "Hello, %d!", b 10, b 0 }
 export function w $main() {
 @start
-	call $printf(l $glb_1, l $glb_2)
-	%t2 =l alloc8 16
-	%t3 =l add %t2, 0
-	storel $glb_3, %t3
-	%t4 =l add %t2, 8
-	storel 0, %t4
-	%t6 =l add %t2, 0
-	%t5 =l loadl %t6
-	call $scanf(l $glb_4, l %t5)
-	%t9 =l add %t2, 0
-	%t8 =l loadl %t9
-	call $printf(l $glb_5, l %t8)
+	%t1 =l alloc8 16
+	%t2 =l add %t1, 0
+	storel $glb_1, %t2
+	%t3 =l add %t1, 8
+	storel 12, %t3
+	%t5 =l add %t1, 0
+	%t4 =l loadl %t5
+	%t6 =l add %t1, 8
+	%t7 =l loadl %t6
+	call $printf(l %t4, l %t7)
 	ret 0
 }

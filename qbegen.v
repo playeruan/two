@@ -359,6 +359,35 @@ fn (mut g QbeGen) gen_expr(expr Expr, expected_t TypeExpr) GenVal {
 			}
 			GenVal{new, to_qbe, false, to_name}
 		}
+		AccessExpr {
+			slot := match expr.left {
+				VarExpr {g.vars_temp_values[expr.left.name]}
+				else {panic("access on non-variable not yet supported")}
+			}
+			left_t := slot.two_typ
+			class_sym := g.symbols.lookup_class(left_t) or {
+				panic("cannot access member of non-class type ${left_t}")
+			}
+			mut offset := 0
+			for name in class_sym.member_order {
+				if name == expr.member_name {break}
+				unsafe {offset += twotype_bytesize(class_sym.members[name].type.str())}
+			}
+
+			mut genval := GenVal{}
+			unsafe {
+				member_type := class_sym.members[expr.member_name].type
+				member_two_typ := member_type.name
+				member_abi := g.twotype_to_abi_type(member_two_typ)
+
+				field_ptr := g.new_tmp()
+				tmp := g.new_tmp()
+				g.emit('${field_ptr} =l add ${slot.val}, $offset')
+				g.emit('$tmp =$member_abi ${g.load_instr(member_two_typ)} $field_ptr')
+				genval = GenVal{tmp, member_abi, false, member_two_typ}
+			}
+			genval
+		}
 		else {panic('unhandled')}
 	}
 }

@@ -23,6 +23,7 @@ struct ClassSymbol {
 	name string
 mut:
 	members map[string]VarSymbol
+	member_order []string // for decl order
 	methods map[string]FuncSymbol
 	only_declared bool
 }
@@ -57,8 +58,10 @@ fn (mut t SymbolTable) register_builtins() {
 	t.classes['string'] = ClassSymbol {
 		name: 'string'
 		members: {
-			'len': VarSymbol{name: 'len', type: TypeExpr{name: 'u64'}}
+			'__data': VarSymbol{name: '__data', type: TypeExpr{name: 'i64'}}
+			'len': VarSymbol{name: 'len', type: TypeExpr{name: 'i64'}}
 		}
+		member_order: ['__data', 'len']
 	}
 
 	t.classes['array'] = ClassSymbol {
@@ -94,6 +97,7 @@ fn (mut t SymbolTable) register_builtins() {
 				}
 			}
   	}
+		member_order: ['len', 'append', 'pop']
   }
 }
 
@@ -270,6 +274,7 @@ fn (mut t SymbolTable) define_class(name string, members []Member) {
 		}
 	}
 
+	mut member_order := []string{}
 	mut members_syms := map[string]VarSymbol{}
 	for member in members {
 		members_syms[member.name] = VarSymbol {
@@ -277,12 +282,14 @@ fn (mut t SymbolTable) define_class(name string, members []Member) {
 			type: member.type,
 			flags: member.flags,
 		}
+		member_order << member.name
 	}
 
 	unsafe {
 		t.classes[name] = ClassSymbol {
 			name: name,
 			members: members_syms,
+			member_order: member_order
 			only_declared: false
 		}
 	}

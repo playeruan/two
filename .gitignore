@@ -7,6 +7,7 @@ two
 *.dylib
 *.dll
 *.two
+out.*
 
 # Ignore binary output folders
 bin/
