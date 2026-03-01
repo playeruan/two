@@ -194,17 +194,20 @@ fn (mut t SymbolTable) define_func(name string, type TypeExpr, flags DeclFlags, 
 	}
 
 	mut f_arg_types := []TypeExpr{}
+	mut f_arg_flags := []DeclFlags{}
 	for arg in args {
 		f_arg_types << arg.type
+		f_arg_flags << arg.flags
 	}
 
   t.scopes[0].vars[name] = VarSymbol {
   	name: name
     type: TypeExpr {
-					name: name,
+					name: name
 					ptr_depth: type.ptr_depth
 					is_fn: true
-					arg_types: f_arg_types,
+					arg_types: f_arg_types
+					arg_flags: f_arg_flags
 					ret_type: &type
 				}
     flags: flags

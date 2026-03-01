@@ -1,5 +1,9 @@
 data $glb_1 = { b "%s\n", b 0 }
 data $glb_2 = { b "uan", b 0 }
+function $bar(w %x_arg) {
+@start
+	ret
+}
 function $foo(l %s_arg) {
 @start
 	%t2 =l add %s_arg, 0
@@ -15,5 +19,9 @@ export function w $main() {
 	%t6 =l add %t4, 8
 	storel 3, %t6
 	call $foo(l %t4)
+	%t8_b_ptr =l alloc4 4
+	storew 2, %t8_b_ptr
+	%t9 =w loadw %t8_b_ptr
+	call $bar(w %t9)
 	ret 0
 }

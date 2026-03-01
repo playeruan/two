@@ -351,6 +351,17 @@ fn (mut c Checker) check_fn_call(expr FnCall) TypeExpr {
 		passed_type := c.check_expr(arg_expr)
 		expected_type := callee_type.arg_types[i]
 
+		if callee_type.arg_flags[i].mutable{
+			name := if expr.callee is VarExpr { (expr.callee as VarExpr).name } else { "expression" }
+			if arg_expr is VarExpr {
+				sym := c.table.lookup_var(arg_expr.name) or {panic("undefined function $name")}
+				if !sym.flags.mutable {
+					panic("passed variable for argument ${i+1} in $name: ${callee_type} must be mutable")
+				}
+			} else {
+				panic("passed expression for argument ${i+1} in $name: ${callee_type} must be mutable")
+			}
+		}
 		if !can_cast(passed_type, expected_type) {
 			panic("Argument ${i+1} mismatch: expected ${expected_type.str()}, got ${passed_type.str()}")
 		}

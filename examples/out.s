@@ -13,6 +13,16 @@ glb_2:
 /* end data */
 
 .text
+bar:
+	pushq %rbp
+	movq %rsp, %rbp
+	leave
+	ret
+.type bar, @function
+.size bar, .-bar
+/* end function bar */
+
+.text
 foo:
 	pushq %rbp
 	movq %rsp, %rbp
@@ -36,6 +46,8 @@ main:
 	movq $3, -8(%rbp)
 	leaq -16(%rbp), %rdi
 	callq foo
+	movl $2, %edi
+	callq bar
 	movl $0, %eax
 	leave
 	ret

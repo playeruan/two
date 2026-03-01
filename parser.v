@@ -54,6 +54,7 @@ mut:
 	// fn
 	is_fn bool
 	arg_types []TypeExpr
+	arg_flags []DeclFlags
 	ret_type ?&TypeExpr
 	// array
 	is_array bool
@@ -120,6 +121,9 @@ fn (te TypeExpr) str() string {
 		mut s := "@".repeat(te.ptr_depth)+"fn("
 		for t in te.arg_types {
 			s += t.str()
+			if t != te.arg_types[te.arg_types.len-1] {
+				s+=", "
+			}
 		}
 		ret_t := *te.ret_type or {&TypeExpr{name: 'void'}}
 		s += ") -> " + ret_t.str()
