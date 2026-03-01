@@ -213,8 +213,12 @@ fn (mut g QbeGen) gen_expr(expr Expr, expected_t TypeExpr) GenVal {
 		}
 		DerefExpr {
 			ex := g.gen_expr(expr.expr, expected_t)
-			tmp := g.new_tmp()
 			new_twotype := ex.two_typ.replace_once('@', '')
+			if new_twotype == 'string' {
+				// @string dereference just gives the struct pointer directly
+				return GenVal{ex.val, 'l', false, 'string'}
+			}
+			tmp := g.new_tmp()
 			abi_typ := g.twotype_to_abi_type(new_twotype)
 			g.emit('${tmp} =${abi_typ} ${g.load_instr(new_twotype)} ${ex.val}')
 			GenVal{tmp, abi_typ, new_twotype.contains('@'), new_twotype}

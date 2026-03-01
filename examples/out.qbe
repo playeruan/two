@@ -1,16 +1,19 @@
-data $glb_1 = { b "uan", b 0 }
-data $glb_2 = { b "Hello, %s!\n", b 0 }
+data $glb_1 = { b "%s\n", b 0 }
+data $glb_2 = { b "uan", b 0 }
+function $foo(l %s_arg) {
+@start
+	%t2 =l add %s_arg, 0
+	%t1 =l loadl %t2
+	call $printf(l $glb_1, l %t1)
+	ret
+}
 export function w $main() {
 @start
-	%t1 =l alloc8 16
-	%t2 =l add %t1, 0
-	storel $glb_1, %t2
-	%t3 =l add %t1, 8
-	storel 3, %t3
-	%t5 =l add %t1, 0
-	%t4 =l loadl %t5
-	call $printf(l $glb_2, l %t4)
-	%t7 =l add %t1, 8
-	%t8 =l loadl %t7
-	ret %t8
+	%t4 =l alloc8 16
+	%t5 =l add %t4, 0
+	storel $glb_2, %t5
+	%t6 =l add %t4, 8
+	storel 3, %t6
+	call $foo(l %t4)
+	ret 0
 }

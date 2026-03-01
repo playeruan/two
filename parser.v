@@ -290,8 +290,13 @@ mut:
 	ts []Token
 	symbols SymbolTable
 	pos int
-	line int
 	stmts []Stmt
+}
+
+@[noreturn]
+fn (mut p Parser) err(s string) {
+	eprintln("line ${p.peek().line}: $s")
+	exit(1)
 }
 
 fn (mut p Parser) peek() Token {
@@ -306,7 +311,7 @@ fn (mut p Parser) advance() Token {
 
 fn (mut p Parser) expect(kind TokKind) {
 	if p.peek().kind != kind {
-		panic("expected ${kind}, got ${p.peek().kind} at line ${p.line}")
+		p.err("expected ${kind}, got ${p.peek().kind}")
 	}
 	p.advance()
 }
@@ -370,10 +375,10 @@ fn (mut p Parser) parse_primary() Expr {
 				typ.ptr_depth++
 				CastExpr{expr: inner, to: typ}
 			} else {
-				panic("unexpected token kind ${t.kind}")
+				p.err("unexpected token kind ${t.kind}")
 			}
 		}
-		else {panic("unexpected token kind ${t.kind}")}
+		else {p.err("unexpected token kind ${t.kind}")}
 	}
 }
 
@@ -381,7 +386,7 @@ fn (mut p Parser) parse_addr() RefExpr {
 	p.expect(.leftparen)
   expr := p.parse_expr(.prefix)
 	if expr.is_literal() {
-		panic("cannot reference a literal value")
+		p.err("cannot reference a literal value")
 	}
 	p.expect(.rightparen)
 	return RefExpr{expr}
@@ -391,7 +396,7 @@ fn (mut p Parser) parse_deref() DerefExpr {
 	p.expect(.leftparen)
 	expr := p.parse_expr(.prefix)
 	if expr.is_literal() {
-		panic("cannot dereference a literal value")
+		p.err("cannot dereference a literal value")
 	}
 	p.expect(.rightparen)
 	return DerefExpr{expr}
@@ -527,7 +532,7 @@ fn (mut p Parser) parse_type() TypeExpr {
 	// class types
 	csym := p.symbols.lookup_class(t.lit)
 	if csym == none {
-		panic("unknown type ${t.lit}")
+		p.err("unknown type ${t.lit}")
 	}
 
 	return TypeExpr{name: t.lit}
@@ -583,7 +588,7 @@ fn (mut p Parser) parse_var_decl() VarDecl {
 	p.advance()
 	name_tok := p.advance()
 	if name_tok.kind != .identifier {
-		panic("expected identifier after let, got ${name_tok.lit}")
+		p.err("expected identifier after let, got ${name_tok.lit}")
 	}
 
 	p.expect(.colon)
@@ -630,7 +635,7 @@ fn (mut p Parser) parse_fn_decl() Stmt {
 
 	name_tok := p.advance()
 	if name_tok.kind != .identifier {
-		panic("expected identifier after fn, got ${name_tok.lit}")
+		p.err("expected identifier after fn, got ${name_tok.lit}")
 	}
 
 	p.expect(.leftparen)
@@ -686,7 +691,7 @@ fn (mut p Parser) parse_fn_decl() Stmt {
 
 	if is_extern {
 		if class_name != "" {
-			panic("extern methods are not supported")
+			p.err("extern methods are not supported")
 		}
 		p.symbols.define_func(name_tok.lit, ret_type, DeclFlags{extern: true}, Block{}, args)
 		return FuncDecl {

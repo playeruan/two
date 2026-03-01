@@ -1,26 +1,42 @@
 .data
 .balign 8
 glb_1:
-	.ascii "uan"
+	.ascii "%s\n"
 	.byte 0
 /* end data */
 
 .data
 .balign 8
 glb_2:
-	.ascii "Hello, %s!\n"
+	.ascii "uan"
 	.byte 0
 /* end data */
+
+.text
+foo:
+	pushq %rbp
+	movq %rsp, %rbp
+	movq (%rdi), %rsi
+	leaq glb_1(%rip), %rdi
+	callq printf
+	leave
+	ret
+.type foo, @function
+.size foo, .-foo
+/* end function foo */
 
 .text
 .globl main
 main:
 	pushq %rbp
 	movq %rsp, %rbp
-	leaq glb_1(%rip), %rsi
-	leaq glb_2(%rip), %rdi
-	callq printf
-	movl $3, %eax
+	subq $16, %rsp
+	leaq glb_2(%rip), %rax
+	movq %rax, -16(%rbp)
+	movq $3, -8(%rbp)
+	leaq -16(%rbp), %rdi
+	callq foo
+	movl $0, %eax
 	leave
 	ret
 .type main, @function
