@@ -57,7 +57,6 @@ fn twotype_bytesize(t string) u8 {
 	}
 }
 
-
 fn is_twotype_signed(name string) bool {
 	return ![
 		"u8", "u16", "u32", "u64", "bool"
@@ -80,7 +79,6 @@ fn (mut c Checker) is_expr_mutable(expr Expr) bool {
 			ParenExpr {c.is_expr_mutable(expr.expr)}
 			DerefExpr {
 				inner_type := c.check_expr(expr.expr)
-				dump("${inner_type} ${inner_type.pointed_flags}")
 				(!inner_type.pointed_flags.const && inner_type.pointed_flags.mutable)
 			}
 			IndexExpr {c.is_expr_mutable(expr.left)}
@@ -145,7 +143,7 @@ fn can_cast(from TypeExpr, to TypeExpr) bool {
 }
 
 fn is_integer_type(name string) bool {
-	return name in ['i8', 'i16', 'i32', 'i64', 'u8', 'u16', 'u32', 'u64']
+	return name in ['i8', 'i16', 'i32', 'i64', 'u8', 'u16', 'u32', 'u64', 'bool']
 }
 
 fn is_float_type(name string) bool {
@@ -175,7 +173,7 @@ fn resolve_generic(t TypeExpr, concrete TypeExpr) TypeExpr {
 }
 
 pub fn (mut c Checker) check(stmts []Stmt) {
-	c.table.jump_to_scope(0)
+	c.table.jump_to_scope(1)
 	for stmt in stmts {
 		c.check_stmt(stmt)
 	}
@@ -411,7 +409,7 @@ fn (mut c Checker) check_stmt(stmt Stmt) {
 				c.check_stmt(stmt.else)
 			}
 		}
-		IfStmt, ElifStmt {
+		IfStmt, ElifStmt, WhileStmt {
 			guard_t := c.check_expr(stmt.guard)
 			assert_types_match(guard_t, TypeExpr{name: 'bool', ptr_depth: 0})
 			c.check_block(stmt.block)

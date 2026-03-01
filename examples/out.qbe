@@ -1,27 +1,8 @@
-data $glb_1 = { b "%s\n", b 0 }
-data $glb_2 = { b "uan", b 0 }
-function $bar(w %x_arg) {
-@start
-	ret
-}
-function $foo(l %s_arg) {
-@start
-	%t2 =l add %s_arg, 0
-	%t1 =l loadl %t2
-	call $printf(l $glb_1, l %t1)
-	ret
-}
+data $glb_1 = { w 174440041 }
+data $glb_2 = { b "%d\n", b 0 }
 export function w $main() {
 @start
-	%t4 =l alloc8 16
-	%t5 =l add %t4, 0
-	storel $glb_2, %t5
-	%t6 =l add %t4, 8
-	storel 3, %t6
-	call $foo(l %t4)
-	%t8_b_ptr =l alloc4 4
-	storew 2, %t8_b_ptr
-	%t9 =w loadw %t8_b_ptr
-	call $bar(w %t9)
+	%t1 =w loadw $glb_1
+	call $printf(l $glb_2, w %t1)
 	ret 0
 }

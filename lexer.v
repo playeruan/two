@@ -102,14 +102,17 @@ fn (mut l Lexer) lex_delimiter() Token {
 	}
 
 	lit := l.source[start..l.pos]
-	kind := get_kind_if_delimiter(lit) or {l.error("invalid token ${lit}")}
+	kind := get_kind_if_delimiter(lit) or {l.error("invalid token ${lit} at line ${l.line}")}
 
 	return l.tok(kind, lit)
 }
 
 fn (mut l Lexer) skip_comment() {
 	l.advance()
-	for l.source[l.pos] != `#` && l.source[l.pos] != 0x0a {
+	for l.peek() != `#` && l.peek() != 0x0a {
+		if l.peek() == 0x0a {
+			l.line++
+		}
 		l.advance()
 	}
 	l.advance()
@@ -125,7 +128,7 @@ fn (mut l Lexer) next_tok() Token {
 
 	mut c := l.peek()
 
-	if c == `#` {
+	for c == `#` {
 		l.skip_comment()
 		c = l.peek()
 	}

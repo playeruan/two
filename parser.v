@@ -163,7 +163,7 @@ fn (f DeclFlags) str() string {
 
 type Stmt = VarDecl | FuncDecl | ClassDecl | ArgDecl |
 						ExprStmt | Member | Block | ReturnStmt | MethodDecl |
-						IfStmt | ElseStmt | ElifStmt | IfChain
+						IfStmt | ElseStmt | ElifStmt | IfChain | WhileStmt
 
 struct VarDecl {
 	name string
@@ -240,6 +240,11 @@ struct IfChain {
 	else  ?ElseStmt
 }
 
+struct WhileStmt {
+	guard Expr
+	block Block
+}
+
 fn (b Block) get_all_returns() []ReturnStmt {
 	mut returns := []ReturnStmt{}
 	for stmt in b.stmts {
@@ -300,6 +305,7 @@ mut:
 @[noreturn]
 fn (mut p Parser) err(s string) {
 	eprintln("line ${p.peek().line}: $s")
+	print_backtrace()
 	exit(1)
 }
 
@@ -370,6 +376,11 @@ fn (mut p Parser) parse_primary() Expr {
 		.key_fn      {p.parse_lambda()}
 		.leftsquare  {p.parse_arr_lit()}
 		.minus       {UnaryExpr{expr: p.parse_expr(.prefix), op: '-', prefix: true}}
+		.leftparen   {
+			e := ParenExpr{expr: p.parse_expr(.lowest)}
+			p.expect(.rightparen)
+			e
+		}
 		.at         {
 			mut typ := p.parse_type()
 			if p.peek().kind == .leftparen {
@@ -576,19 +587,29 @@ fn (mut p Parser) parse_arr_lit() ArrayLiteral {
 
 fn (mut p Parser) parse_stmt() Stmt {
 	match p.peek().kind {
-		.key_let, .key_mut   {return p.parse_var_decl()}
+		.key_let, .key_mut, .key_const {return p.parse_var_decl()}
 		.key_fn, .key_export, .key_extern
 			{return p.parse_fn_decl()}
 		.key_class           {return p.parse_class_decl()}
 		.key_return          {return p.parse_return()}
 		.leftbrace           {return p.parse_block()}
 		.key_if              {return p.parse_if()}
+		.key_while           {return p.parse_while()}
 		else                 {return p.parse_expr_stmt()}
 	}
 }
 
 fn (mut p Parser) parse_var_decl() VarDecl {
 	mut_ := p.peek().kind == .key_mut
+	const_ := p.peek().kind == .key_const
+
+	if const_ && p.symbols.current_scope_idx != 1 {
+		p.err("constants can only be declared in the global scope")
+	}
+	if !const_ && p.symbols.current_scope_idx == 1 {
+		p.err("only constants can be declared in the global scope")
+	}
+
 	p.advance()
 	name_tok := p.advance()
 	if name_tok.kind != .identifier {
@@ -603,6 +624,11 @@ fn (mut p Parser) parse_var_decl() VarDecl {
 
 	flags := DeclFlags{
 		mutable: mut_
+		const: const_
+	}
+
+	if const_ && !name_tok.lit.is_upper() {
+		p.err("const names must be all capital letters")
 	}
 
 	p.symbols.define_var(name_tok.lit, type_expr, flags)
@@ -757,6 +783,16 @@ fn (mut p Parser) parse_if() IfChain {
 		if: ifstmt
 		elifs: elifstmts
 		else: elsestmt
+	}
+}
+
+fn (mut p Parser) parse_while() WhileStmt {
+	p.expect(.key_while)
+	guard := p.parse_expr(.lowest)
+	block := p.parse_block()
+	return WhileStmt{
+		guard: guard
+		block: block
 	}
 }
 

@@ -104,8 +104,9 @@ fn (mut g QbeGen) instr_from_op(op string, src_type string) string {
 		'-'  { 'sub' }
 		'*'  { 'mul' }
 		'/'  { if is_unsigned { 'udiv' } else { 'div' } }
-		'==' { 'c${cmp_prefix}eq' }
-		'!=' { 'c${cmp_prefix}ne' }
+		'%'  { if is_unsigned { 'urem' } else { 'rem' } }
+		'==' { 'ceq' }
+		'!=' { 'cne' }
 		'<'  { 'c${cmp_prefix}lt' }
 		'>'  { 'c${cmp_prefix}gt' }
 		'<=' { 'c${cmp_prefix}le' }
@@ -144,6 +145,7 @@ fn (mut g QbeGen) emit_global(line string) {
 fn (mut g QbeGen) gen_expr(expr Expr, expected_t TypeExpr) GenVal {
 	return match expr {
 		VoidExpr {voidgenval}
+		ParenExpr {g.gen_expr(expr.expr, expected_t)}
 		IntegerLiteral {
 			t := g.twotype_to_qbetype('i32')
 			GenVal{expr.val.str(), t, false, 'i32'}
@@ -381,6 +383,7 @@ fn (mut g QbeGen) gen_expr(expr Expr, expected_t TypeExpr) GenVal {
 			mut genval := GenVal{}
 			unsafe {
 				member_type := class_sym.members[expr.member_name].type
+
 				member_two_typ := member_type.name
 				member_abi := g.twotype_to_abi_type(member_two_typ)
 
@@ -400,7 +403,11 @@ fn (mut g QbeGen) gen_func(decl FuncDecl) {
 	if decl.flags.extern {
 		return
 	}
-	g.vars_temp_values.clear()
+	for key in g.vars_temp_values.clone().keys() {
+		if !g.vars_temp_values[key].val.starts_with('\$') {
+			g.vars_temp_values.delete(key)
+		}
+	}
 	mut has_returned := false
 	mut ret_t := g.twotype_to_abi_type(decl.type.str())
 	if ret_t != "" {
@@ -429,12 +436,19 @@ fn (mut g QbeGen) gen_func(decl FuncDecl) {
 
 fn (mut g QbeGen) gen_stmt(stmt Stmt, expected_t TypeExpr) {
 	match stmt {
-		VarDecl    { g.gen_local_var(stmt) }
+		VarDecl    {
+			if stmt.flags.const {
+				g.gen_const(stmt)
+			} else {
+				g.gen_local_var(stmt)
+			}
+		}
 		ReturnStmt {
 			g.block_terminated = true
 			g.gen_return(stmt, expected_t)
 		}
 		IfChain    { g.gen_if_chain(stmt, expected_t) }
+		WhileStmt  { g.gen_while(stmt, expected_t) }
 		Block      {
 			prevscope := g.symbols.current_scope_idx
 			g.symbols.jump_to_scope(stmt.scope_idx)
@@ -453,9 +467,36 @@ fn (mut g QbeGen) gen_stmt(stmt Stmt, expected_t TypeExpr) {
 	}
 }
 
+fn (mut g QbeGen) gen_const(decl VarDecl) {
+	if !decl.value.is_literal() {
+		panic("const definition must be a literal value")
+	}
+	constname := g.new_global()
+	if decl.type.str() == 'string' {
+		if decl.value is StringLiteral {
+			// value.val is already a pointer to the 16-byte struct
+			g.emit_global("data ${constname} = { b \"${decl.value.val.str()}\", b 0 }")
+			g.vars_temp_values[decl.name] = GenVal{constname, 'l', false, 'string'}
+		} else {
+			panic("const definition must be a literal value")
+		}
+		return
+	}
+	qbetype := g.twotype_to_qbetype(decl.type.str())
+	g.vars_temp_values[decl.name] = GenVal{constname, qbetype, true, decl.type.name}
+	val := match decl.value {
+		IntegerLiteral 	{decl.value.val.str()}
+		FloatLiteral 		{"${qbetype}_"+decl.value.val.str()}
+		BoolLiteral     {int(decl.value.val == true).str()}
+		else            {panic("const definition must be a literal value")}
+	}
+	g.emit_global("data ${constname} = { $qbetype $val }")
+
+}
+
 fn (mut g QbeGen) gen_local_var(decl VarDecl) {
 	value := g.coerce(g.gen_expr(decl.value, decl.type), decl.type)
-	if decl.type.name == 'string' {
+	if decl.type.str() == 'string' {
 		// value.val is already a pointer to the 16-byte struct
 		g.vars_temp_values[decl.name] = GenVal{value.val, 'l', true, 'string'}
 		return
@@ -540,6 +581,25 @@ fn (mut g QbeGen) gen_if_chain(chain IfChain, expected_t TypeExpr) {
 		g.emit_label(endiflbl)
 	}
 }
+
+fn (mut g QbeGen) gen_while(stmt WhileStmt, expected_t TypeExpr) {
+	guard_lbl := g.new_label()+"_guardwhile"
+	begin_lbl := g.new_label()+"_beginwhile"
+	end_lbl := g.new_label()+"_endwhile"
+	g.emit_label(guard_lbl)
+	guardval := g.gen_expr(stmt.guard, expected_t)
+	g.emit("jnz ${guardval.val}, ${begin_lbl}, ${end_lbl}")
+	g.emit_label(begin_lbl)
+	g.gen_stmt(stmt.block, expected_t)
+	g.emit("jmp ${guard_lbl}")
+	g.emit_label(end_lbl)
+}
+
+/*
+@begin
+...
+@end
+*/
 
 pub fn (mut g QbeGen) gen_program(ast []Stmt, table SymbolTable) {
 	g.symbols= table

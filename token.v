@@ -27,6 +27,7 @@ enum TokKind as u8 {
 	key_deref
 	key_nullptr
 	key_return
+	key_while
 	key_if
 	key_else
 	key_elif
@@ -49,6 +50,7 @@ enum TokKind as u8 {
 	minus
 	star
 	slash
+	percent
 	dot
 	comma
 	colon
@@ -101,7 +103,7 @@ fn (tk TokKind) get_prec() Precedence {
 		.eq, .pluseq, .minuseq, .stareq, .slasheq {.assigment}
 		.eqeq, .lteq, .gteq, .lt, .gt, .neq {.comparison}
 		.plus, .minus {.sum}
-		.star, .slash {.product}
+		.star, .slash, .percent {.product}
 		.dot {.access}
 		.leftparen {.call}
 		.increment, .decrement {.suffix}
@@ -134,6 +136,7 @@ fn get_kind_if_delimiter(s string) ?TokKind {
 		"-"  {.minus}
 		"*"  {.star}
 		"/"  {.slash}
+		"%"  {.percent}
 		"."  {.dot}
 		","  {.comma}
 		"++" {.increment}
@@ -183,6 +186,7 @@ fn get_kind_if_key(s string) ?TokKind {
 		"if"      {.key_if}
 		"else"    {.key_else}
 		"elif"    {.key_elif}
+		"while"   {.key_while}
 		else  {none}
 	}
 }
