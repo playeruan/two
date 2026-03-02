@@ -4,7 +4,7 @@ import two
 import os
 
 fn main() {
-	content := os.read_file("examples/source.two") or {return}
+	content := os.read_file(".examples/source.two") or {return}
 	mut l := two.Lexer{}
 	ts := l.lex_input(content)
 	mut p := two.Parser{}
@@ -13,7 +13,7 @@ fn main() {
 	c.check(ast)
 	mut qg := two.QbeGen{}
   qg.gen_program(ast, table)
-	os.write_file("examples/out.qbe", qg.buf.str()) or {panic('error writing out.qbe')}
-	os.execute("qbe examples/out.qbe -o examples/out.s")
-	os.execute("cc -O3 examples/out.s -o examples/out")
+	os.write_file(".examples/out.qbe", qg.buf.str()) or {panic('error writing out.qbe')}
+	os.execute("qbe .examples/out.qbe -o .examples/out.s")
+	os.execute("cc -O3 .examples/out.s -o .examples/out")
 }
