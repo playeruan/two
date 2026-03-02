@@ -15,5 +15,5 @@ fn main() {
   qg.gen_program(ast, table)
 	os.write_file(".examples/out.qbe", qg.buf.str()) or {panic('error writing out.qbe')}
 	os.execute("qbe .examples/out.qbe -o .examples/out.s")
-	os.execute("cc -O3 .examples/out.s -o .examples/out")
+	os.execute("cc -O2 -lm .examples/out.s -o .examples/out")
 }
