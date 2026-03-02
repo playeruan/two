@@ -12,6 +12,8 @@ pub mut:
 	vars_temp_values map[string]GenVal
 	block_terminated bool
 	symbols        SymbolTable
+	loop_guard_lbl string
+	loop_end_lbl string
 }
 
 struct GenVal {
@@ -308,7 +310,11 @@ fn (mut g QbeGen) gen_expr(expr Expr, expected_t TypeExpr) GenVal {
     	ret_qbe  := if ret_type.name == 'void' { '' } else { g.twotype_to_abi_type(ret_type.str()) }
 			mut argsstr := "("
 			for arg_v in arg_vals {
-				argsstr += "${arg_v.typ} ${arg_v.val}"
+				argtyp := match arg_v.typ {
+					"h", "b" {"w"}
+					else {arg_v.typ}
+				}
+				argsstr += "${argtyp} ${arg_v.val}"
 				if arg_v != arg_vals[arg_vals.len-1] {argsstr+=", "}
 			}
 			argsstr += ")"
@@ -432,6 +438,7 @@ fn (mut g QbeGen) gen_func(decl FuncDecl) {
 		g.emit('ret')
 	}
 	g.buf.write_string('}\n')
+	g.block_terminated = false
 }
 
 fn (mut g QbeGen) gen_stmt(stmt Stmt, expected_t TypeExpr) {
@@ -463,6 +470,20 @@ fn (mut g QbeGen) gen_stmt(stmt Stmt, expected_t TypeExpr) {
 		}
 		ExprStmt   {g.gen_expr(stmt.expr, expected_t)}
 		FuncDecl   {g.gen_func(stmt)}
+		ContinueStmt {
+			if g.loop_guard_lbl == "" {
+				panic("invalid continue statement")
+			}
+			g.emit("jmp ${g.loop_guard_lbl}")
+			g.block_terminated = true
+		}
+		BreakStmt {
+			if g.loop_end_lbl == "" {
+				panic("invalid break statement")
+			}
+			g.emit("jmp ${g.loop_end_lbl}")
+			g.block_terminated = true
+		}
 		else       { panic('unhandled') }
 	}
 }
@@ -583,16 +604,25 @@ fn (mut g QbeGen) gen_if_chain(chain IfChain, expected_t TypeExpr) {
 }
 
 fn (mut g QbeGen) gen_while(stmt WhileStmt, expected_t TypeExpr) {
+	oldloopguard := g.loop_guard_lbl
+	oldloopend:= g.loop_end_lbl
 	guard_lbl := g.new_label()+"_guardwhile"
+	g.loop_guard_lbl = guard_lbl
 	begin_lbl := g.new_label()+"_beginwhile"
 	end_lbl := g.new_label()+"_endwhile"
+	g.loop_end_lbl = end_lbl
 	g.emit_label(guard_lbl)
 	guardval := g.gen_expr(stmt.guard, expected_t)
 	g.emit("jnz ${guardval.val}, ${begin_lbl}, ${end_lbl}")
 	g.emit_label(begin_lbl)
 	g.gen_stmt(stmt.block, expected_t)
-	g.emit("jmp ${guard_lbl}")
+	if !g.block_terminated {
+		g.emit("jmp ${guard_lbl}")
+	}
+	g.block_terminated = false
 	g.emit_label(end_lbl)
+	g.loop_guard_lbl = oldloopguard
+	g.loop_end_lbl = oldloopend
 }
 
 /*

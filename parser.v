@@ -163,7 +163,8 @@ fn (f DeclFlags) str() string {
 
 type Stmt = VarDecl | FuncDecl | ClassDecl | ArgDecl |
 						ExprStmt | Member | Block | ReturnStmt | MethodDecl |
-						IfStmt | ElseStmt | ElifStmt | IfChain | WhileStmt
+						IfStmt | ElseStmt | ElifStmt | IfChain | WhileStmt |
+						BreakStmt | ContinueStmt
 
 struct VarDecl {
 	name string
@@ -244,6 +245,9 @@ struct WhileStmt {
 	guard Expr
 	block Block
 }
+
+struct ContinueStmt {}
+struct BreakStmt    {}
 
 fn (b Block) get_all_returns() []ReturnStmt {
 	mut returns := []ReturnStmt{}
@@ -595,6 +599,16 @@ fn (mut p Parser) parse_stmt() Stmt {
 		.leftbrace           {return p.parse_block()}
 		.key_if              {return p.parse_if()}
 		.key_while           {return p.parse_while()}
+		.key_continue        {
+			p.expect(.key_continue)
+			p.expect(.semicolon)
+			return ContinueStmt{}
+		}
+		.key_break           {
+			p.expect(.key_break)
+			p.expect(.semicolon)
+			return BreakStmt{}
+		}
 		else                 {return p.parse_expr_stmt()}
 	}
 }

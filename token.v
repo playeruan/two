@@ -7,6 +7,8 @@ enum TokKind as u8 {
 	key_class
 	key_export
 	key_extern
+	key_continue
+	key_break
 	key_fn
 	key_void
 	key_i8
@@ -187,6 +189,8 @@ fn get_kind_if_key(s string) ?TokKind {
 		"else"    {.key_else}
 		"elif"    {.key_elif}
 		"while"   {.key_while}
+		"continue" {.key_continue}
+		"break"    {.key_break}
 		else  {none}
 	}
 }

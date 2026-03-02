@@ -417,7 +417,7 @@ fn (mut c Checker) check_stmt(stmt Stmt) {
 		ElseStmt {
 			c.check_block(stmt.block)
 		}
-		ReturnStmt {}
+		ReturnStmt, ContinueStmt, BreakStmt {}
 		else     {panic("unhandled")}
 	}
 }
