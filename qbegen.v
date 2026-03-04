@@ -340,7 +340,7 @@ fn (mut g QbeGen) gen_expr(expr Expr, expected_t TypeExpr) GenVal {
 				if twotype_bytesize(to_name) == twotype_bytesize(from_name) {
 					return GenVal{src.val, to_qbe, false, to_name}
 				}
-				// int → int
+				// int to int
 				if twotype_bytesize(from_name) < twotype_bytesize(to_name) {
 					// widening
 					sign := if is_twotype_signed(from_name) { 's' } else { 'u' }
@@ -350,17 +350,17 @@ fn (mut g QbeGen) gen_expr(expr Expr, expected_t TypeExpr) GenVal {
 				return GenVal{src.val, to_qbe, false, to_name}
 				}
 			} else if !is_src_float && is_dst_float {
-				// int → float
+				// int to float
 				sign := if is_twotype_signed(from_name) { 's' } else { 'u' }
 				size := if from_name in ['i64', 'u64'] { 'l' } else { 'w' }
 				g.emit('${new} =${to_qbe} ${sign}${size}tof ${src.val}')
 			} else if is_src_float && !is_dst_float {
-				// float → int
+				// float to int
 				sign := if is_twotype_signed(to_name) { 's' } else { 'u' }
 				src_prefix := if from_name == 'f32' { 's' } else { 'd' }
 				g.emit('${new} =${to_qbe} ${src_prefix}to${sign}i ${src.val}')
 			} else {
-				// float → float
+				// float to float
 				if from_name == 'f32' && to_name == 'f64' {
 					g.emit('${new} =d exts ${src.val}')
 				} else if from_name == 'f64' && to_name == 'f32' {
@@ -624,12 +624,6 @@ fn (mut g QbeGen) gen_while(stmt WhileStmt, expected_t TypeExpr) {
 	g.loop_guard_lbl = oldloopguard
 	g.loop_end_lbl = oldloopend
 }
-
-/*
-@begin
-...
-@end
-*/
 
 pub fn (mut g QbeGen) gen_program(ast []Stmt, table SymbolTable) {
 	g.symbols= table
