@@ -51,6 +51,7 @@ fn twotype_bytesize(t string) u8 {
 		'i32', 'u32', 'f32', 'bool' {4}
 		'i64', 'u64', 'f64' {8}
 		'string' {16}
+		'array' {24}
 		'void' {0}
 		else {panic('unhandled type ${t}')}
 

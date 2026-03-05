@@ -32,7 +32,7 @@ fn (mut g QbeGen) twotype_to_abi_type(t string) string {
 }
 
 fn (mut g QbeGen) twotype_to_qbetype(t string) string {
-	if t.contains("@") {return 'l'}
+	if t.contains("@") || t.contains("[]") {return 'l'}
 	return match t {
 		'i8', 'u8' {'b'}
 		'i16', 'u16' {'h'}
@@ -58,7 +58,7 @@ fn (mut g QbeGen) qbetype_bytesize(t string) u8 {
 }
 
 fn (mut g QbeGen) load_instr(two_typ string) string {
-	if two_typ.contains("@") {return 'loadl'}
+	if two_typ.contains("@") || two_typ.contains("[]") {return 'loadl'}
   return match two_typ {
       'i8'  { 'loadsb' }
       'u8'  { 'loadub' }
@@ -187,9 +187,65 @@ fn (mut g QbeGen) gen_expr(expr Expr, expected_t TypeExpr) GenVal {
 
 			GenVal{struct_ptr, 'l', false, 'string'}
 		}
+		ArrayLiteral {
+			if expr.vals.len == 0 {
+				panic("empty array literals not yet supported")
+			}
+
+			// Determine element type from expected_t
+			elem_type := if expected_t.is_array {
+				*expected_t.elem_type or {&TypeExpr{name: 'void'}}
+			} else {
+				panic("cannot infer array element type")
+			}
+
+			elem_size := twotype_bytesize(elem_type.name)
+			num_elems := expr.vals.len
+			total_data_size := u8(num_elems) * elem_size
+
+			// header (24 bytes)
+			array_header := g.new_tmp()
+			g.emit('${array_header} =l alloc8 24')
+
+			// data buffer
+			data_buffer := g.new_tmp()
+			g.emit('${data_buffer} =l alloc8 ${total_data_size}')
+
+			// store each element into the data buffer
+			for i, val_expr in expr.vals {
+				val := g.coerce(g.gen_expr(val_expr, elem_type), elem_type)
+				elem_qbe_type := g.twotype_to_qbetype(elem_type.name)
+
+				offset := i * int(elem_size)
+				field_ptr := g.new_tmp()
+				g.emit('${field_ptr} =l add ${data_buffer}, ${offset}')
+				g.emit('store${elem_qbe_type} ${val.val}, ${field_ptr}')
+			}
+
+			// write data pointer at offset 0
+			header_data_field := g.new_tmp()
+			g.emit('${header_data_field} =l add ${array_header}, 0')
+			g.emit('storel ${data_buffer}, ${header_data_field}')
+
+			// write length to header at offset 8
+			header_length_field := g.new_tmp()
+			g.emit('${header_length_field} =l add ${array_header}, 8')
+			g.emit('storel ${num_elems}, ${header_length_field}')
+
+			// write capacity at offset 16
+			header_capacity_field := g.new_tmp()
+			g.emit('${header_capacity_field} =l add ${array_header}, 16')
+			g.emit('storel ${num_elems}, ${header_capacity_field}')
+
+			// return the header pointer
+			GenVal{array_header, 'l', true, "array"}
+		}
 		VarExpr        {
 			t := g.vars_temp_values[expr.name]
-			if t.is_addr {
+			// Arrays stay as pointers — don't dereference them
+			if t.two_typ.contains("[]") {
+				t
+			} else if t.is_addr {
 				tmp := g.new_tmp()
 				if t.two_typ == 'string' {
 					// load data pointer from offset 0 of string struct
@@ -226,6 +282,26 @@ fn (mut g QbeGen) gen_expr(expr Expr, expected_t TypeExpr) GenVal {
 			abi_typ := g.twotype_to_abi_type(new_twotype)
 			g.emit('${tmp} =${abi_typ} ${g.load_instr(new_twotype)} ${ex.val}')
 			GenVal{tmp, abi_typ, new_twotype.contains('@'), new_twotype}
+		}
+		IndexExpr {
+			arr := g.gen_expr(expr.left, expected_t)
+			idx := g.gen_expr(expr.idx, TypeExpr{name: 'i64', ptr_depth: 0})
+			elem_twotype := arr.two_typ.replace_once('[]', '')
+			elem_size := twotype_bytesize(elem_twotype)
+
+			tmp := g.new_tmp()
+			data_field := g.new_tmp() + "_data"
+			elem_off_tmp := g.new_tmp() + "_off"
+			elem_addr_tmp := g.new_tmp() + "_addr"
+			abi_typ := g.twotype_to_abi_type(elem_twotype)
+
+			g.emit('${data_field} =l add ${arr.val}, 0')
+			g.emit('${data_field} =l loadl ${data_field}')
+
+			g.emit('${elem_off_tmp} =l mul ${idx.val}, ${elem_size}')
+			g.emit('${elem_addr_tmp} =l add ${data_field}, ${elem_off_tmp}')
+			g.emit('${tmp} =${abi_typ} ${g.load_instr(elem_twotype)} ${elem_addr_tmp}')
+			GenVal{tmp, abi_typ, elem_twotype.contains('@'), elem_twotype}
 		}
 		UnaryExpr {
 			if expr.op == '-' {
@@ -376,7 +452,7 @@ fn (mut g QbeGen) gen_expr(expr Expr, expected_t TypeExpr) GenVal {
 				VarExpr {g.vars_temp_values[expr.left.name]}
 				else {panic("access on non-variable not yet supported")}
 			}
-			left_t := slot.two_typ
+			left_t := if slot.two_typ.str().contains("[]") {"array"} else {slot.two_typ.str()}
 			class_sym := g.symbols.lookup_class(left_t) or {
 				panic("cannot access member of non-class type ${left_t}")
 			}
@@ -517,6 +593,11 @@ fn (mut g QbeGen) gen_const(decl VarDecl) {
 
 fn (mut g QbeGen) gen_local_var(decl VarDecl) {
 	value := g.coerce(g.gen_expr(decl.value, decl.type), decl.type)
+	if decl.type.is_array {
+		// Arrays are pointers to headers
+		g.vars_temp_values[decl.name] = GenVal{value.val, 'l', false, decl.type.str()}
+		return
+	}
 	if decl.type.str() == 'string' {
 		// value.val is already a pointer to the 16-byte struct
 		g.vars_temp_values[decl.name] = GenVal{value.val, 'l', true, 'string'}

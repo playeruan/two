@@ -67,7 +67,9 @@ fn (mut t SymbolTable) register_builtins() {
 	t.classes['array'] = ClassSymbol {
     name: 'array'
     members: {
-      'len': VarSymbol{name: 'len', type: TypeExpr{name: 'i32'}}
+			'__data_ptr': VarSymbol{name: '__data_ptr', type: TypeExpr{name: 'i64'}}
+      'len': VarSymbol{name: 'len', type: TypeExpr{name: 'i64'}}
+      'capacity': VarSymbol{name: 'capacity', type: TypeExpr{name: 'i64'}}
     }
     methods: {
       'append': FuncSymbol{
@@ -97,7 +99,7 @@ fn (mut t SymbolTable) register_builtins() {
 				}
 			}
   	}
-		member_order: ['len', 'append', 'pop']
+		member_order: ['__data_ptr' 'len', 'capacity', 'append', 'pop']
   }
 }
 
