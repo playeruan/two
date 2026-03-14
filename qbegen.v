@@ -153,8 +153,14 @@ fn (mut g QbeGen) gen_expr(expr Expr, expected_t TypeExpr) GenVal {
 			GenVal{expr.val.str(), t, false, 'i32'}
 		}
 		FloatLiteral {
-			t := g.twotype_to_qbetype('f32')
-			GenVal{t+"_"+expr.val.str(), t, false, 'f32'}
+			t := g.twotype_to_qbetype(expected_t.str())
+			glb := g.new_global()
+			g.emit_global("data ${glb} = { $t ${t}_${expr.val} }")
+
+			tmp := g.new_tmp()
+			g.emit('${tmp} =$t loads ${glb}')
+
+			GenVal{tmp, t, false, expected_t.str()}
 		}
 		BoolLiteral {
 			t := g.twotype_to_qbetype('bool')
@@ -454,6 +460,7 @@ fn (mut g QbeGen) gen_expr(expr Expr, expected_t TypeExpr) GenVal {
 			}
 			left_t := if slot.two_typ.str().contains("[]") {"array"} else {slot.two_typ.str()}
 			class_sym := g.symbols.lookup_class(left_t) or {
+				dump(g.vars_temp_values)
 				panic("cannot access member of non-class type ${left_t}")
 			}
 			mut offset := 0
